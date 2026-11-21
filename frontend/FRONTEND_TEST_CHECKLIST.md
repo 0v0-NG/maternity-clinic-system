@@ -504,10 +504,11 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
 
 #### C. Emergency Unit & Tap-to-Call
 1. **Verify Emergency Card**:
-   - Red emergency card with *"24/7"* availability badge.
-   - Instructions: *"For acute emergencies (heavy bleeding, severe pain, labour onset), proceed directly to the Emergency Obstetric Triage."*.
-   - Click **Tap to Call: +2348000000911**:
-     - Verifies `tel:+2348000000911` phone dialer link triggers.
+   - Clearly labelled "Emergency Unit" card with red accent styling and *"24/7"* availability badge.
+   - Emergency contact number is visible as text: `+2348001122334`.
+   - Click **Call now**:
+     - Verifies `tel:+2348001122334` phone dialer link triggers.
+   - Fallback behavior: if number is missing, displays: *"Emergency number not available yet. Please go straight to the Emergency Unit."*.
 
 #### D. Clinic Schedules & Indicative Booking Notice
 1. **Verify Antenatal Clinic Card**:

@@ -166,35 +166,72 @@ export default function ClinicInfoPage() {
             </Card>
 
             {/* Emergency Unit Card */}
-            {info.emergencyUnit && (
-              <Card className="p-5 space-y-3 border-red-200 shadow-sm bg-red-50/40">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-status-emergency uppercase tracking-wider">
-                      Emergency Obstetric Unit
+            {(() => {
+              const emergencyNumber = (info.emergencyUnitNumber || info.emergencyUnit?.phone || '').trim();
+              const telHref = emergencyNumber
+                ? (emergencyNumber.startsWith('+')
+                    ? '+' + emergencyNumber.slice(1).replace(/\D/g, '')
+                    : emergencyNumber.replace(/\D/g, ''))
+                : '';
+
+              return (
+                <Card className="p-5 space-y-4 border-red-200 shadow-sm bg-red-50/50">
+                  <div className="flex items-center justify-between border-b border-red-200 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-red-100 text-status-emergency flex items-center justify-center flex-shrink-0">
+                        <Phone size={18} />
+                      </div>
+                      <div>
+                        <h2 className="text-base font-bold text-red-950">
+                          Emergency Unit
+                        </h2>
+                        <span className="text-[11px] text-red-700 font-medium">
+                          Labour or acute obstetric emergencies
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[11px] font-bold bg-status-emergency text-white px-2.5 py-0.5 rounded-full">
+                      24/7
                     </span>
                   </div>
-                  <span className="text-[11px] font-bold bg-status-emergency text-white px-2 py-0.5 rounded-full">
-                    {info.emergencyUnit.available || '24/7'}
-                  </span>
-                </div>
 
-                <p className="text-xs text-body leading-relaxed">
-                  {info.emergencyUnit.instructions}
-                </p>
+                  {emergencyNumber ? (
+                    <div className="space-y-3">
+                      <div>
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-red-800 block mb-0.5">
+                          Emergency Contact Number
+                        </span>
+                        <p className="text-xl font-black text-status-emergency tracking-wide">
+                          {emergencyNumber}
+                        </p>
+                      </div>
 
-                {info.emergencyUnit.phone && (
-                  <div className="pt-1">
-                    <a
-                      href={`tel:${info.emergencyUnit.phone}`}
-                      className="flex items-center justify-center gap-2 w-full h-11 bg-status-emergency text-white rounded-xl font-bold text-sm hover:bg-red-700 transition-colors shadow-sm"
-                    >
-                      <Phone size={16} /> Tap to Call: {info.emergencyUnit.phone}
-                    </a>
-                  </div>
-                )}
-              </Card>
-            )}
+                      <p className="text-xs text-red-900 leading-relaxed">
+                        For severe symptoms (heavy bleeding, severe abdominal pain, labour onset), call immediately or proceed directly to the Emergency Obstetric Triage.
+                      </p>
+
+                      <div className="pt-1">
+                        <a href={`tel:${telHref}`} className="block w-full">
+                          <Button
+                            type="button"
+                            variant="danger"
+                            className="w-full text-sm font-bold gap-2 h-11"
+                          >
+                            <Phone size={16} /> Call now
+                          </Button>
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="py-2">
+                      <p className="text-xs text-red-900 font-medium leading-relaxed">
+                        Emergency number not available yet. Please go straight to the Emergency Unit.
+                      </p>
+                    </div>
+                  )}
+                </Card>
+              );
+            })()}
 
             {/* Clinic Operating Days & Hours */}
             {info.clinicDaysAndHours && (
