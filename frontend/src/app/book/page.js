@@ -652,7 +652,7 @@ export default function BookAppointmentPage() {
                   </div>
                 )}
 
-                {/* Continue to Step 2 */}
+                {/* Step 1 Next Button */}
                 <div className="pt-2">
                   <Button
                     type="button"
@@ -661,7 +661,7 @@ export default function BookAppointmentPage() {
                     onClick={() => setStep(2)}
                     className="w-full text-sm"
                   >
-                    Continue to Date & Time
+                    Next
                   </Button>
                 </div>
               </div>
@@ -726,7 +726,7 @@ export default function BookAppointmentPage() {
                   </div>
                 )}
 
-                {/* Continue to Step 3 */}
+                {/* Step 2 Next Button */}
                 <div className="flex gap-3 pt-2">
                   <Button
                     type="button"
@@ -743,7 +743,7 @@ export default function BookAppointmentPage() {
                     onClick={() => setStep(3)}
                     className="flex-1 text-sm"
                   >
-                    Continue to Review
+                    Next
                   </Button>
                 </div>
               </div>
@@ -825,7 +825,7 @@ export default function BookAppointmentPage() {
                       disabled={isSubmitting}
                       className="w-full text-base font-bold"
                     >
-                      {isSubmitting ? 'Confirming Booking...' : 'Confirm Booking'}
+                      {isSubmitting ? 'Confirming booking...' : 'Confirm booking'}
                     </Button>
                     <Button
                       type="button"

@@ -218,7 +218,7 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
    - In "1. Choose Clinic", click on **Antenatal Clinic**.
    - Notice appears under "2. Who is this visit for?": *"Antenatal visits are for the mother only."*.
    - Confirm: There are no baby checkboxes or baby addition options shown.
-   - Click **Continue to Date & Time**.
+   - Click **Next**.
 2. **Step 2 - Date & Time (SlotPicker)**:
    - Wizard progresses to *"Step 2 of 3"* (progress bar at 66%).
    - Summary chip shows *"Clinic: Antenatal Clinic · For: Mother"*.
@@ -227,7 +227,7 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
    - Available time chips appear in 12-hour format (e.g. `8:20 AM`, `8:40 AM`).
    - Click a slot chip (e.g. `8:20 AM`). The chip turns solid green with outline.
    - Preview card shows *"Selected Time: 8:20 AM"*.
-   - Click **Continue to Review**.
+   - Click **Next**.
 3. **Step 3 - Review & Confirm**:
    - Wizard progresses to *"Step 3 of 3"* (progress bar at 100%).
    - Summary card shows:
@@ -236,7 +236,7 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
      - Time: `8:20 AM – 8:40 AM (12-Hour Lagos Time)`
      - Who it is for: **Mother**
      - Notice: *"You can reschedule or cancel this appointment free of charge up to 4 hours before the scheduled start time via your dashboard."*.
-   - Click **Confirm Booking** (button disables and displays *"Confirming Booking..."* during request).
+   - Click **Confirm booking** (button disables and displays *"Confirming booking..."* during request).
 4. **Success Screen**:
    - Success screen loads with green checkmark and header *"Booking Confirmed!"*.
    - Summary card displays clinic, date, time, and attendee.
@@ -252,17 +252,17 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
    - Section 2 displays three selection buttons: **Me**, **My baby**, **Me & my baby**.
    - Select **Me** (`booking_type = "mother"`).
    - Confirm: No baby checkboxes are shown.
-   - Click **Continue to Date & Time**.
+   - Click **Next**.
 3. **Step 2 - Date & Time**:
    - Select a date in the next 14 days and choose an available slot chip (e.g. `1:30 PM`).
-   - Click **Continue to Review**.
+   - Click **Next**.
 4. **Step 3 - Review & Confirm**:
    - Verify summary card displays:
      - Clinic: **Postnatal Clinic**
      - Date: `DD/MM/YYYY`
      - Time: `1:30 PM – 2:00 PM`
      - Who it is for: **Mother**
-   - Click **Confirm Booking**.
+   - Click **Confirm booking**.
    - Success screen displays with confirmation details.
 
 ---
@@ -282,12 +282,12 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
      - Click **Save & Select Baby**.
      - Toast: *"Baby profile added and selected!"*.
      - Mini form closes and `Amara Bello` is listed and **checked automatically**.
-   - With at least one baby checked, **Continue to Date & Time** becomes enabled.
-   - Click **Continue to Date & Time**.
+   - With at least one baby checked, **Next** becomes enabled.
+   - Click **Next**.
 3. **Step 2 & 3**:
    - Pick date and slot chip.
    - Review card displays *"Who it is for: Baby (Amara Bello)"*.
-   - Click **Confirm Booking**.
+   - Click **Confirm booking**.
    - Success screen confirms visit for `Baby (Amara Bello)`.
 
 ---
@@ -305,12 +305,12 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
    - Now in the baby checklist, ensure **both** checkboxes are ticked:
      - [x] `Amara Bello`
      - [x] `Zainab Bello`
-   - Click **Continue to Date & Time**.
+   - Click **Next**.
 3. **Step 2 & 3**:
    - Pick an available date and time.
    - On Step 3 Review card, verify attendee line:
      - *"Who it is for: Mother & Baby (Amara Bello, Zainab Bello)"*.
-   - Click **Confirm Booking**.
+   - Click **Confirm booking**.
    - Success screen displays booking for twins.
    - In `/appointments/[id]`, both baby profiles are listed under "Registered Baby Details".
 
@@ -321,8 +321,8 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
    - Open two browser tabs on `/book` for two different mothers.
    - In both tabs, select the exact same clinic, date, and slot chip (e.g. `24/11/2026 at 9:00 AM`).
    - Proceed to Step 3 in both tabs.
-   - In Tab A, click **Confirm Booking** -> Booking succeeds.
-   - In Tab B, click **Confirm Booking** -> Backend returns `409 SLOT_TAKEN`.
+   - In Tab A, click **Confirm booking** -> Booking succeeds.
+   - In Tab B, click **Confirm booking** -> Backend returns `409 SLOT_TAKEN`.
    - **Expected in Tab B**:
      - Friendly error toast: *"Another patient just took this slot. Please choose another time."*.
      - Wizard automatically returns to **Step 2 (Date & Time)**.
