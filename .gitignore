@@ -8,5 +8,6 @@ node_modules/
 coverage/
 dist/
 .next/
+.next-build/
 out/
 *.log

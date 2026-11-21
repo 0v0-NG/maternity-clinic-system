@@ -18,17 +18,28 @@ export default function StaffPortalPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const stored = localStorage.getItem('user');
-    if (!stored) {
+    try {
+      const stored = localStorage.getItem('user');
+      if (!stored || stored === 'undefined' || stored === 'null') {
+        localStorage.removeItem('user');
+        router.push('/login');
+        return;
+      }
+      const parsed = JSON.parse(stored);
+      if (!parsed) {
+        localStorage.removeItem('user');
+        router.push('/login');
+        return;
+      }
+      setUser(parsed);
+      if (parsed.role === 'midwife' || parsed.role === 'doctor') {
+        setActiveTab('consultation');
+      }
+      loadClinics();
+    } catch {
+      localStorage.removeItem('user');
       router.push('/login');
-      return;
     }
-    const parsed = JSON.parse(stored);
-    setUser(parsed);
-    if (parsed.role === 'midwife' || parsed.role === 'doctor') {
-      setActiveTab('consultation');
-    }
-    loadClinics();
   }, []);
 
   useEffect(() => {

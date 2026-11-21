@@ -15,13 +15,25 @@ export default function DashboardPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const stored = localStorage.getItem('user');
-    if (!stored) {
+    try {
+      const stored = localStorage.getItem('user');
+      if (!stored || stored === 'undefined' || stored === 'null') {
+        localStorage.removeItem('user');
+        router.push('/login');
+        return;
+      }
+      const parsed = JSON.parse(stored);
+      if (!parsed || typeof parsed !== 'object') {
+        localStorage.removeItem('user');
+        router.push('/login');
+        return;
+      }
+      setUser(parsed);
+      loadData();
+    } catch {
+      localStorage.removeItem('user');
       router.push('/login');
-      return;
     }
-    setUser(JSON.parse(stored));
-    loadData();
   }, []);
 
   const loadData = async () => {
@@ -40,7 +52,10 @@ export default function DashboardPage() {
   };
 
   const handleLogout = () => {
-    localStorage.clear();
+    sessionStorage.removeItem('token');
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
     router.push('/login');
   };
 

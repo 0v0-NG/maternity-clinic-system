@@ -20,19 +20,25 @@ export default function AdminDashboardPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const stored = localStorage.getItem('user');
-    if (!stored) {
+    try {
+      const stored = localStorage.getItem('user');
+      if (!stored || stored === 'undefined' || stored === 'null') {
+        localStorage.removeItem('user');
+        router.push('/login');
+        return;
+      }
+      const parsed = JSON.parse(stored);
+      if (!parsed || parsed.role !== 'admin') {
+        toast.error('Admin privileges required.');
+        router.push('/dashboard');
+        return;
+      }
+      setUser(parsed);
+      loadAllData();
+    } catch {
+      localStorage.removeItem('user');
       router.push('/login');
-      return;
     }
-    const parsed = JSON.parse(stored);
-    if (parsed.role !== 'admin') {
-      toast.error('Admin privileges required.');
-      router.push('/dashboard');
-      return;
-    }
-    setUser(parsed);
-    loadAllData();
   }, []);
 
   const loadAllData = async () => {

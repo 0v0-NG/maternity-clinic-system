@@ -25,8 +25,9 @@ export default function LoginPage() {
       toast.success('Logged in successfully.');
 
       // Role-based redirect after login.
-      if (user.role === 'admin') router.push('/admin');
-      else if (['front_desk', 'midwife', 'doctor'].includes(user.role)) router.push('/staff');
+      const role = user?.role || 'mother';
+      if (role === 'admin') router.push('/admin');
+      else if (['front_desk', 'midwife', 'doctor'].includes(role)) router.push('/staff');
       else router.push('/dashboard');
     } catch (error) {
       toast.error(getErrorMessage(error, 'Login failed. Please check your details and try again.'));

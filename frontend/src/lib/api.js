@@ -35,7 +35,9 @@ const logoutOnAuthFailure = () => {
 // Attach Bearer token to every request
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
-    const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+    const sessionToken = sessionStorage.getItem('token');
+    const localToken = localStorage.getItem('token');
+    const token = (sessionToken && sessionToken !== 'undefined') ? sessionToken : ((localToken && localToken !== 'undefined') ? localToken : null);
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -69,11 +71,14 @@ api.interceptors.response.use(
 
       try {
         const refreshToken = localStorage.getItem('refreshToken');
-        if (!refreshToken) {
+        if (!refreshToken || refreshToken === 'undefined') {
           throw new Error('No refresh token available');
         }
         const { data } = await api.post('/auth/refresh-token', { refreshToken });
-        const newToken = data.data.token;
+        const newToken = data?.data?.token;
+        if (!newToken) {
+          throw new Error('Failed to refresh token');
+        }
         sessionStorage.setItem('token', newToken);
         localStorage.setItem('refreshToken', refreshToken);
         onRefreshed(newToken);

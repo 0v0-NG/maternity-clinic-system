@@ -31,6 +31,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const timerRef = useRef(null);
+  const verifyingRef = useRef(false);
   const router = useRouter();
   const { register, verifyOTP, resendOTP } = useAuth();
 
@@ -124,6 +125,7 @@ export default function RegisterPage() {
   };
 
   const handleOtpChange = (index, value) => {
+    if (loading || verifyingRef.current) return;
     const digit = value.replace(/\D/g, '').slice(-1);
     const next = [...otp];
     next[index] = digit;
@@ -134,6 +136,7 @@ export default function RegisterPage() {
   };
 
   const handleOtpKeyDown = (index, e) => {
+    if (loading || verifyingRef.current) return;
     if (e.key === 'Backspace' && !otp[index] && index > 0) {
       document.getElementById(`otp-${index - 1}`)?.focus();
     }
@@ -141,6 +144,7 @@ export default function RegisterPage() {
 
   const handleOtpPaste = (e) => {
     e.preventDefault();
+    if (loading || verifyingRef.current) return;
     const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, OTP_LENGTH);
     if (!pasted) return;
     const next = Array(OTP_LENGTH).fill('');
@@ -151,20 +155,25 @@ export default function RegisterPage() {
   };
 
   const handleVerify = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
+    if (loading || verifyingRef.current) return;
+
     const code = otp.join('');
     if (code.length !== OTP_LENGTH) {
       return toast.error('Please enter all 6 digits of the code.');
     }
 
+    verifyingRef.current = true;
     setLoading(true);
     try {
       const user = await verifyOTP(motherId, pinId, code);
       toast.success('Your account is verified. Welcome!');
-      if (user.role === 'admin') router.push('/admin');
-      else if (['front_desk', 'midwife', 'doctor'].includes(user.role)) router.push('/staff');
+      const role = user?.role || 'mother';
+      if (role === 'admin') router.push('/admin');
+      else if (['front_desk', 'midwife', 'doctor'].includes(role)) router.push('/staff');
       else router.push('/dashboard');
     } catch (error) {
+      verifyingRef.current = false;
       toast.error(getErrorMessage(error, 'Verification failed. Please try again.'));
     } finally {
       setLoading(false);
@@ -252,29 +261,29 @@ export default function RegisterPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
                 <div>
-                  <label className="block text-base font-medium text-body mb-1.5" htmlFor="hospital_id">
-                    Hospital ID <span className="text-body-muted font-normal">(optional)</span>
+                  <label className="block text-base font-medium text-body mb-1.5 whitespace-nowrap" htmlFor="hospital_id">
+                    Hospital ID
                   </label>
                   <input
                     id="hospital_id"
                     type="text"
                     className="input-field text-base"
-                    placeholder="Folder number"
+                    placeholder="Folder number (optional)"
                     value={form.hospital_id}
                     onChange={(e) => setForm({ ...form, hospital_id: e.target.value })}
                   />
                 </div>
                 <div>
-                  <label className="block text-base font-medium text-body mb-1.5" htmlFor="hmo_number">
-                    HMO / NHIA no. <span className="text-body-muted font-normal">(optional)</span>
+                  <label className="block text-base font-medium text-body mb-1.5 whitespace-nowrap" htmlFor="hmo_number">
+                    HMO / NHIA no.
                   </label>
                   <input
                     id="hmo_number"
                     type="text"
                     className="input-field text-base"
-                    placeholder="Enrollment number"
+                    placeholder="Enrollment number (optional)"
                     value={form.hmo_number}
                     onChange={(e) => setForm({ ...form, hmo_number: e.target.value })}
                   />
@@ -319,7 +328,8 @@ export default function RegisterPage() {
                       value={digit}
                       onChange={(e) => handleOtpChange(index, e.target.value)}
                       onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                      className="w-12 h-14 text-center text-2xl font-bold text-body border border-border rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      disabled={loading}
+                      className="w-12 h-14 text-center text-2xl font-bold text-body border border-border rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50"
                       aria-label={`Digit ${index + 1}`}
                     />
                   ))}

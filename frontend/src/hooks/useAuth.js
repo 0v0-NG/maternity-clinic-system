@@ -6,27 +6,90 @@ import { authAPI } from '../lib/api';
 
 const AuthContext = createContext(null);
 
+function decodeJwt(token) {
+  try {
+    if (!token || typeof token !== 'string') return null;
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    const stored = localStorage.getItem('user');
-    if (stored) {
-      setUser(JSON.parse(stored));
+    try {
+      const stored = localStorage.getItem('user');
+      if (!stored || stored === 'undefined' || stored === 'null') {
+        localStorage.removeItem('user');
+        setUser(null);
+      } else {
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed === 'object') {
+          setUser(parsed);
+        } else {
+          localStorage.removeItem('user');
+          setUser(null);
+        }
+      }
+    } catch {
+      localStorage.removeItem('user');
+      setUser(null);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   const login = async (phone, password) => {
-    const { data } = await authAPI.login({ phone, password });
+    const res = await authAPI.login({ phone, password });
+    const resData = res?.data?.data || {};
+    const token = resData.token;
+    const refreshToken = resData.refreshToken;
+    let userObj = resData.user;
+
+    if (!userObj && token) {
+      const decoded = decodeJwt(token);
+      if (decoded) {
+        userObj = {
+          id: decoded.id,
+          name: decoded.name || '',
+          role: decoded.role || 'mother',
+        };
+      }
+    }
+
     // Access token: sessionStorage (SPA in-memory lifetime); refresh token: localStorage.
-    sessionStorage.setItem('token', data.data.token);
-    localStorage.setItem('refreshToken', data.data.refreshToken);
-    localStorage.setItem('user', JSON.stringify(data.data.user));
-    setUser(data.data.user);
-    return data.data.user;
+    if (token) {
+      sessionStorage.setItem('token', token);
+    }
+    if (refreshToken) {
+      localStorage.setItem('refreshToken', refreshToken);
+    } else {
+      localStorage.removeItem('refreshToken');
+    }
+
+    if (userObj) {
+      localStorage.setItem('user', JSON.stringify(userObj));
+      setUser(userObj);
+      return userObj;
+    } else {
+      localStorage.removeItem('user');
+      setUser(null);
+      return null;
+    }
   };
 
   const logout = () => {
@@ -44,12 +107,42 @@ export function AuthProvider({ children }) {
   };
 
   const verifyOTP = async (motherId, pinId, otp) => {
-    const { data } = await authAPI.verifyOTP({ motherId, pinId, otp });
-    sessionStorage.setItem('token', data.data.token);
-    localStorage.setItem('refreshToken', data.data.refreshToken);
-    localStorage.setItem('user', JSON.stringify(data.data.user));
-    setUser(data.data.user);
-    return data.data.user;
+    const res = await authAPI.verifyOTP({ motherId, pinId, otp });
+    const resData = res?.data?.data || {};
+    const token = resData.token;
+    const refreshToken = resData.refreshToken;
+    let userObj = resData.user;
+
+    if (!userObj && token) {
+      const decoded = decodeJwt(token);
+      if (decoded) {
+        userObj = {
+          id: decoded.id || motherId,
+          name: decoded.name || '',
+          role: decoded.role || 'mother',
+          is_verified: true,
+        };
+      }
+    }
+
+    if (token) {
+      sessionStorage.setItem('token', token);
+    }
+    if (refreshToken) {
+      localStorage.setItem('refreshToken', refreshToken);
+    } else {
+      localStorage.removeItem('refreshToken');
+    }
+
+    if (userObj) {
+      localStorage.setItem('user', JSON.stringify(userObj));
+      setUser(userObj);
+      return userObj;
+    } else {
+      localStorage.removeItem('user');
+      setUser(null);
+      return null;
+    }
   };
 
   const resendOTP = async (phone) => {
