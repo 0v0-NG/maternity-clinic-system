@@ -27,10 +27,11 @@ export default function StatusBadge({ status, late_arrival = false, className = 
   const config = STATUS_CONFIG[status] || STATUS_CONFIG.booked;
   const pad = size === 'large' ? 'px-3 py-1.5' : 'px-2.5 py-1';
   const textSize = size === 'large' ? 'text-sm' : 'text-xs';
+  const Icon = ICONS[status] || Clock2;
 
   return (
     <div className={`inline-flex items-center gap-1.5 ${pad} rounded-full border ${config.color} ${textSize} font-semibold ${className}`}>
-      <ICONS[status] || Clock2 size={size === 'large' ? 14 : 12} className="opacity-90" />
+      <Icon size={size === 'large' ? 14 : 12} className="opacity-90" />
       <span>{config.label}</span>
       {late_arrival && (
         <span className="bg-status-late text-white text-[10px] font-bold px-1.5 py-0.5 rounded uppercase">Late</span>
