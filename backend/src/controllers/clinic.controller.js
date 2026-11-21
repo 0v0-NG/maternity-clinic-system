@@ -1,5 +1,5 @@
 const db = require('../config/database');
-const { generateId } = require('../utils/helpers');
+const { generateId, getLagosToday, parseLagosDateTime } = require('../utils/helpers');
 const { AppError } = require('../middleware/errorHandler');
 
 /**
@@ -96,10 +96,23 @@ const getAvailableSlots = async (req, res, next) => {
     const { date } = req.query;
     if (!date) throw new AppError('Date query parameter is required.', 400);
 
+    const today = getLagosToday();
+    if (date < today) {
+      return res.json({
+        success: true,
+        data: {
+          clinicId: req.params.id,
+          date,
+          availableSlots: [],
+          totalAvailable: 0,
+        },
+      });
+    }
+
     let query = db('schedule_slots')
       .leftJoin('appointments', function () {
         this.on('schedule_slots.id', 'appointments.slot_id')
-          .andOnIn('appointments.status', ['booked', 'checked_in']);
+          .andOn('appointments.status', '!=', db.raw('?', ['cancelled']));
       })
       .where('schedule_slots.clinic_id', req.params.id)
       .where('schedule_slots.slot_date', date)
@@ -131,10 +144,24 @@ const getAvailableSlots = async (req, res, next) => {
       staffRows.forEach((s) => (staffMap[s.id] = s.name));
     }
 
-    const enriched = slots.map((s) => ({
+    let enriched = slots.map((s) => ({
       ...s,
       staffName: staffMap[s.staff_id] || null,
     }));
+
+    // If querying today, filter out slots whose start time (mother) or end time (staff) has passed
+    if (date === today) {
+      const nowMs = Date.now();
+      enriched = enriched.filter((s) => {
+        if (isStaff) {
+          const endTime = parseLagosDateTime(date, s.end_time);
+          return endTime.getTime() > nowMs;
+        } else {
+          const startTime = parseLagosDateTime(date, s.start_time);
+          return startTime.getTime() > nowMs;
+        }
+      });
+    }
 
     res.json({
       success: true,

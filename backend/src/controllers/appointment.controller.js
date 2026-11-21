@@ -44,6 +44,22 @@ const bookAppointment = async (req, res, next) => {
         throw new AppError('This slot is reserved for walk-in patients.', 400, 'SLOT_RESERVED');
       }
 
+      // Reject booking into slots that have already passed in Africa/Lagos time
+      const slotStartTime = parseLagosDateTime(slot.slot_date, slot.start_time);
+      const slotEndTime = parseLagosDateTime(slot.slot_date, slot.end_time);
+      const nowMs = Date.now();
+
+      if (req.user.role === 'mother') {
+        if (slotStartTime.getTime() <= nowMs) {
+          throw new AppError('Cannot book a slot whose start time has already passed.', 400, 'SLOT_PAST');
+        }
+      } else {
+        // Staff booking (e.g. walk-ins): allowed on today's slots that have not ended
+        if (slotEndTime.getTime() <= nowMs) {
+          throw new AppError('Cannot book a slot that has already ended.', 400, 'SLOT_PAST');
+        }
+      }
+
       // Check if slot is already taken by any non-cancelled appointment
       const existingBooking = await trx('appointments')
         .where('slot_id', slot_id)
@@ -293,6 +309,21 @@ const rescheduleAppointment = async (req, res, next) => {
       if (newSlot.is_blocked) throw new AppError('This slot is blocked.', 400, 'BAD_REQUEST');
       if (newSlot.is_walkin && req.user.role === 'mother') {
         throw new AppError('This slot is reserved for walk-in patients.', 400, 'SLOT_RESERVED');
+      }
+
+      // Reject rescheduling into slots that have already passed in Africa/Lagos time
+      const newSlotStartTime = parseLagosDateTime(newSlot.slot_date, newSlot.start_time);
+      const newSlotEndTime = parseLagosDateTime(newSlot.slot_date, newSlot.end_time);
+      const nowMs = Date.now();
+
+      if (req.user.role === 'mother') {
+        if (newSlotStartTime.getTime() <= nowMs) {
+          throw new AppError('Cannot reschedule into a slot whose start time has already passed.', 400, 'SLOT_PAST');
+        }
+      } else {
+        if (newSlotEndTime.getTime() <= nowMs) {
+          throw new AppError('Cannot reschedule into a slot that has already ended.', 400, 'SLOT_PAST');
+        }
       }
 
       const taken = await trx('appointments')
