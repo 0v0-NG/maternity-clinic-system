@@ -12,6 +12,7 @@ import {
   LogOut,
   ChevronRight,
   Heart,
+  Building2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
@@ -263,6 +264,25 @@ export default function DashboardPage() {
                 <span className="font-semibold text-xs text-body leading-tight">
                   My Profile
                 </span>
+              </Card>
+            </Link>
+
+            <Link href="/clinic-info" className="block col-span-2">
+              <Card className="p-3.5 flex items-center justify-between hover:border-primary-400 hover:shadow-sm transition-all bg-white">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary-100 text-primary-700 flex items-center justify-center flex-shrink-0">
+                    <Building2 size={20} />
+                  </div>
+                  <div className="text-left">
+                    <span className="font-semibold text-xs text-body block">
+                      Hospital & Clinic Information
+                    </span>
+                    <span className="text-[11px] text-body-muted block">
+                      Operating hours, location & emergency triage
+                    </span>
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-body-muted" />
               </Card>
             </Link>
           </div>

@@ -335,3 +335,192 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
    - Attempt to book a second appointment on the same date/time when an active booking already exists.
    - Backend returns `409 OVERLAP`.
    - **Expected**: Error alert displays: *"You already have an appointment at this time."*.
+
+---
+
+## Step 5: Live Queue, Profile & Babies, and Clinic Information
+
+### 5.1 Scenario 1: Live Queue Tracking (`/queue`)
+
+#### A. Empty State (No Appointments Today)
+1. Log in as a mother who has no appointments scheduled for today (`slot_date === today` in Africa/Lagos time).
+2. Tap **Queue** in the bottom navigation or click **Live Queue** from Dashboard Quick Actions.
+3. **Verify Header**:
+   - Header title: *"Live Clinic Queue"*.
+   - Back arrow navigates back to `/dashboard`.
+   - Emergency notice is displayed at the top: *"Labour or an emergency? Go straight to the Emergency Unit."*.
+4. **Verify Empty State**:
+   - Clock icon is horizontally centered.
+   - Title: *"No Appointments Today"*.
+   - Description: *"You have no clinic appointments scheduled for today in the hospital calendar. Book your next visit easily."*.
+   - Centered primary button: **Book Appointment** (navigates to `/book`).
+
+#### B. Setup Today's Appointment for Live Queue Testing
+1. Navigate to `/book`.
+2. Select **Antenatal Clinic** or **Postnatal Clinic**.
+3. Choose today's date (first date chip in SlotPicker).
+4. Select an upcoming slot for today (e.g., afternoon slot after current time).
+5. Click **Next** -> **Confirm booking**.
+6. The appointment is created for today with initial status `"booked"`.
+7. Note down the Appointment ID or return to `/queue`.
+
+#### C. Pre-Check-in State (Status: "booked")
+1. Navigate to `/queue`.
+2. **Verify Scheduled Session Card**:
+   - Clinic name is displayed (e.g. *"Antenatal Clinic"*).
+   - "For: Mother" (or baby name).
+   - Date: *"Today, DD/MM/YYYY"*.
+   - Time: 12-hour format (e.g. *"2:00 PM – 2:20 PM (Lagos Time)"*).
+   - Status badge shows green: **Booked**.
+3. **Verify Check-in Notice Card**:
+   - Amber alert card displays:
+     - Heading: *"You have not checked in yet"*.
+     - Notice: *"Please check in at the front desk when you arrive at the hospital. The records officer will verify your arrival and issue your queue ticket."*.
+     - Bullet points with check-in instructions.
+
+#### D. Check-in via Staff Portal & Checked-in Queue State
+1. In another window or via staff portal / curl, check the mother in:
+   - Call `POST /api/appointments/:id/checkin` with front desk credentials.
+   - Status updates to `"checked_in"`, assigning ticket number (e.g. `ANC-001`) and position in line.
+2. In the mother's `/queue` tab, wait for the 20-second auto-poll or tap the **Refresh** button in the header.
+3. **Verify Checked-in Display**:
+   - Large ticket number is rendered prominently (e.g. `ANC-001`).
+   - Queue Position card displays position number (e.g. `#1`, *"Number 1 in line"*).
+   - Estimated wait displays: *"You are next in line (< 5 mins)"* for position 1, or estimated minutes for position > 1.
+   - Status badge shows teal: **Checked In** (and includes the amber **Late** badge if arrival was past grace period).
+   - **Now Serving** card shows current serving ticket (or *"Calling next patient..."*).
+   - **Privacy Verification**: Confirm NO other patient's name is displayed anywhere on screen.
+
+#### E. Active Consultation State (Status: "in_consultation")
+1. Update appointment status to `"in_consultation"` via clinical staff portal:
+   - `PUT /api/appointments/:id/status` with `{ status: "in_consultation" }`.
+2. Mother's `/queue` tab auto-refreshes or click **Refresh**:
+3. **Verify "It's your turn!" Display**:
+   - Prominent green card with pulsating check icon appears.
+   - Banner heading: *"It's your turn!"*.
+   - Shows her exact queue ticket number: *"Ticket Number: ANC-001"*.
+   - Clear directive: *"Please proceed directly into the consultation room with the attending doctor or midwife."*.
+   - Status badge shows teal: **In Consultation**.
+
+#### F. Consultation Completed State (Status: "completed")
+1. Staff marks consultation completed:
+   - `PUT /api/appointments/:id/status` with `{ status: "completed" }`.
+2. Mother's screen updates:
+   - Card displays: *"Consultation Completed"*.
+   - Thank you message and link button: **View Appointments History**.
+   - Auto-polling stops completely (no background network requests sent).
+
+#### G. Polling & Visibility Control
+1. Confirm the "Last updated" time updates every 20 seconds.
+2. Minimize or switch away from the browser tab (`document.hidden = true`).
+3. Confirm in network activity that polling is suspended while hidden.
+4. Switch back to tab: polling resumes cleanly.
+
+---
+
+### 5.2 Scenario 2: Mother Profile & Babies Management (`/profile`)
+
+#### A. View & Edit Mother Profile
+1. Tap **Profile** in the bottom navigation.
+2. **Verify Mother's Information Form**:
+   - Field 1 **Full Name**: Pre-filled with her name (editable).
+   - Field 2 **Phone Number (Verified)**: Pre-filled with verified phone number, disabled/read-only with helper note.
+   - Field 3 **Hospital ID**: Editable input with placeholder *"Folder No. (e.g. HOSP-1234)"*.
+   - Field 4 **HMO / NHIA No.**: Editable input with placeholder *"Optional"*.
+   - Primary button: **Save** (48px high, Nigerian green).
+3. **Edit Profile Details**:
+   - Update Full Name to `Amina Bello-Smith`.
+   - Enter Hospital ID: `HOSP-998877`.
+   - Enter HMO Number: `NHIA-112233`.
+   - Click **Save**.
+4. **Expected**:
+   - Button briefly shows *"Saving..."*.
+   - Success toast appears: *"Profile updated successfully!"*.
+   - Form retains updated values.
+   - Return to `/dashboard` -> greeting reflects updated first name: *"Hello, Amina 👋"*.
+
+#### B. List & Add Baby Profiles
+1. On `/profile`, scroll to **My Babies** section.
+2. Existing babies are rendered as cards showing name, formatted date of birth (`DD/MM/YYYY`), and capitalized sex (`Female` / `Male`).
+3. Each card has an **Edit** (pencil) and **Delete** (trash) icon.
+4. Click **Add another baby**:
+   - Inline form opens below the list with fields: Baby's Name, Date of Birth, Sex.
+   - Enter details:
+     - Name: `Ibrahim Bello`
+     - DOB: Past date (e.g. `2024-08-10`)
+     - Sex: `Male`
+   - Click **Save**.
+5. **Expected**:
+   - Success toast: *"Baby profile added!"*.
+   - Inline form closes and `Ibrahim Bello` appears immediately in the babies list.
+
+#### C. Edit Baby Profile
+1. On `Ibrahim Bello` card, click the **Edit** icon (pencil).
+2. The card transforms into an inline edit form pre-filled with his current details.
+3. Change Name to `Ibrahim Al-Amin Bello`.
+4. Click **Save**:
+   - Success toast: *"Baby profile updated."*.
+   - Edit form closes and card reflects updated name: `Ibrahim Al-Amin Bello`.
+5. Click **Cancel** on any edit to verify form cancels without saving changes.
+
+#### D. Delete Baby Profile with Confirmation Warning
+1. On `Ibrahim Al-Amin Bello` card, click the **Delete** icon (trash).
+2. **Verify Confirmation Dialog**:
+   - Modal dialog appears with title: *"Delete Baby Profile?"*.
+   - Prominent red warning:
+     *"Warning: This baby will be removed from your appointment history. Are you sure you want to delete the profile for Ibrahim Al-Amin Bello?"*.
+   - Two buttons: **Cancel** (outline) and **Delete** (danger red).
+3. Click **Cancel**:
+   - Dialog closes; baby profile remains untouched.
+4. Click Delete icon again, and click **Delete**:
+   - Success toast: *"Baby profile removed."*.
+   - Modal closes; baby card is removed from the list.
+
+#### E. Log Out
+1. Scroll to the bottom of the `/profile` page.
+2. Click **Log Out**:
+   - Success toast: *"Logged out successfully."*.
+   - Local and session storage tokens are wiped.
+   - Visitor is redirected to `/login`.
+
+---
+
+### 5.3 Scenario 3: Hospital & Clinic Information (`/clinic-info`)
+
+#### A. Navigation & Access
+1. From `/dashboard`, tap the **Hospital & Clinic Information** card in Quick Actions.
+2. From `/profile`, tap the **Hospital & Clinic Information** card.
+3. Verify page loads at `/clinic-info` with:
+   - Header with back button to `/dashboard` and refresh icon.
+   - Top emergency banner: *"Labour or an emergency? Go straight to the Emergency Unit."*.
+   - Bottom navigation bar visible and fixed.
+
+#### B. Medical Facility & Google Maps
+1. **Verify Hospital Card**:
+   - Displays hospital name: *"General Hospital Lagos / Federal Medical Centre"*.
+   - Displays physical address with pin icon: *"123 Broad Street, Lagos Island, Lagos State, Nigeria"*.
+   - Click **Open in Google Maps**:
+     - Opens Google Maps in a new browser tab (`target="_blank" rel="noopener noreferrer"`).
+
+#### C. Emergency Unit & Tap-to-Call
+1. **Verify Emergency Card**:
+   - Red emergency card with *"24/7"* availability badge.
+   - Instructions: *"For acute emergencies (heavy bleeding, severe pain, labour onset), proceed directly to the Emergency Obstetric Triage."*.
+   - Click **Tap to Call: +2348000000911**:
+     - Verifies `tel:+2348000000911` phone dialer link triggers.
+
+#### D. Clinic Schedules & Indicative Booking Notice
+1. **Verify Antenatal Clinic Card**:
+   - Hours: `08:00 - 12:00 (Lagos Time)`.
+   - Slot duration: `20 min slots`.
+   - Clinic Days: Chips for `Monday`, `Tuesday`, `Wednesday`, `Thursday`, `Friday`.
+   - Description text explaining morning consultation sessions.
+2. **Verify Postnatal Clinic Card**:
+   - Hours: `13:00 - 16:00 (Lagos Time)`.
+   - Slot duration: `30 min slots`.
+   - Clinic Days: Chips for `Monday`, `Wednesday`, `Friday`.
+   - Description text explaining afternoon mother and newborn checks.
+3. **Verify Indicative Notice**:
+   - Amber alert explains that days shown are indicative schedules, and actual booking availability is determined by the live booking calendar.
+4. **Verify Centered CTA**:
+   - Centered **Book Appointment** button links directly to `/book`.

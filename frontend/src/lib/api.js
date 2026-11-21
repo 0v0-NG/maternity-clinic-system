@@ -126,6 +126,11 @@ export const clinicAPI = {
   getSlots: (id, date) => api.get(`/clinics/${id}/slots?date=${date}`),
 };
 
+// --- Clinic Info ---
+export const clinicInfoAPI = {
+  get: () => api.get('/clinic-info'),
+};
+
 // --- Appointments ---
 export const appointmentAPI = {
   book: (data) => api.post('/appointments', data),
