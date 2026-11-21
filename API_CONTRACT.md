@@ -175,7 +175,7 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
 ```json
 {
   "success": true,
-  "message": "Registration successful. Please enter the OTP sent to your phone.",
+  "message": "Registration successful. Please verify your phone number with the OTP sent.",
   "data": {
     "motherId": "b1b7021b-417c-473d-82d0-a0bc5e510825",
     "pinId": "demo-pin-1732185934000",
@@ -183,6 +183,7 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
   }
 }
 ```
+- **Note on Optional Fields**: While `hospital_id` and `hmo_number` are accepted in the request body, the backend registration handler currently does not persist them to the database on registration. Mothers can persist these fields after verification via `PUT /api/mothers/profile`.
 - **Error Codes**: `VALIDATION_ERROR` (422), `CONFLICT` (409).
 
 #### `POST /api/auth/verify-otp`
@@ -197,18 +198,12 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
   "success": true,
   "message": "Phone number verified successfully.",
   "data": {
-    "token": "eyJhbGciOiJIUzI1NiIsInR5c...",
-    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5c...",
-    "user": {
-      "id": "b1b7021b-417c-473d-82d0-a0bc5e510825",
-      "name": "Amina Bello",
-      "phone": "+2348012345678",
-      "role": "mother",
-      "is_verified": true
-    }
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImIxYjcwMjFiLTQxN2MtNDczZC04MmQwLWEwYmM1ZTUxMDgyNSIsInJvbGUiOiJtb3RoZXIiLCJuYW1lIjoiQW1pbmEgQmVsbG8iLCJpYXQiOjE3OTUyNzk...",
   }
 }
 ```
+> [!NOTE]
+> The live backend returns only `{ token }` in `data` upon OTP verification. Unlike `POST /api/auth/login`, it does **not** return `refreshToken` or a `user` object. Clients should decode the JWT payload to extract `{ id, name, role }` or fetch `GET /api/mothers/profile`. See Section 9.
 - **Error Codes**: `VALIDATION_ERROR` (422), `OTP_INVALID` (400), `NOT_FOUND` (404).
 
 #### `POST /api/auth/resend-otp`
@@ -267,6 +262,9 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
 ```
 - **Error Codes**: `VALIDATION_ERROR` (422), `UNAUTHORIZED` (401).
 
+> [!NOTE]
+> **No `/api/auth/me` Endpoint**: The backend does **not** provide a `GET /api/auth/me` endpoint. Calling `/api/auth/me` returns `404 NOT_FOUND`. Authenticated mothers should use `GET /api/mothers/profile` to retrieve profile details and registered babies.
+
 ---
 
 ### Clinics & Schedule Slots (`/api/clinics`)
@@ -282,13 +280,17 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
       "id": "ff3280aa-8a8a-47ee-9706-23ca57c9a2ae",
       "name": "Antenatal Clinic",
       "slot_duration_min": 20,
-      "walkin_reserve_pct": 0.2
+      "walkin_reserve_pct": 0.2,
+      "created_at": "2026-11-21T08:55:55.141Z",
+      "updated_at": "2026-11-21T08:55:55.141Z"
     },
     {
       "id": "7e6ad70c-074e-4276-a97f-9f3922aafa3b",
       "name": "Postnatal Clinic",
       "slot_duration_min": 30,
-      "walkin_reserve_pct": 0.2
+      "walkin_reserve_pct": 0.2,
+      "created_at": "2026-11-21T08:55:55.141Z",
+      "updated_at": "2026-11-21T08:55:55.141Z"
     }
   ]
 }
@@ -402,12 +404,18 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
     "id": "e8df483f-67d7-4be7-b35f-eb59d9f5aa1a",
     "mother_id": "b1b7021b-417c-473d-82d0-a0bc5e510825",
     "clinic_id": "ff3280aa-8a8a-47ee-9706-23ca57c9a2ae",
+    "staff_id": "9d9d522b-5937-4f8e-8793-b62d24c82dee",
     "slot_id": "4d6bbb73-4b20-4554-9872-443894aa0a74",
     "status": "booked",
     "booking_type": "mother",
+    "queue_number": null,
     "booked_at": "2026-11-21T10:30:15.000Z",
-    "reminder_24h_sent": false,
-    "reminder_2h_sent": false
+    "checked_in_at": null,
+    "reminder_24h_sent": true,
+    "reminder_2h_sent": false,
+    "created_at": "2026-11-21T10:30:15.000Z",
+    "updated_at": "2026-11-21T10:30:15.000Z",
+    "late_arrival": false
   }
 }
 ```
@@ -560,7 +568,7 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
 ```json
 {
   "success": true,
-  "message": "Appointment cancelled successfully."
+  "message": "Appointment cancelled."
 }
 ```
 - **Error Codes**: `CUTOFF_PASSED` (400), `BAD_REQUEST` (400, if already completed/cancelled), `FORBIDDEN` (403).
@@ -641,7 +649,7 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
 
 #### `GET /api/queue/position/:appointmentId`
 - **Role**: `mother` (ownership enforced), `front_desk`, `midwife`, `doctor`, `admin`
-- **Success Response (200 OK)**:
+- **Success Response (200 OK - After Check-in)**:
 ```json
 {
   "success": true,
@@ -651,6 +659,19 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
     "status": "checked_in",
     "late_arrival": false,
     "message": "You are number 1 in the queue."
+  }
+}
+```
+- **Success Response (200 OK - Before Check-in / Status Booked)**:
+```json
+{
+  "success": true,
+  "data": {
+    "status": "booked",
+    "queueNumber": null,
+    "position": null,
+    "late_arrival": false,
+    "message": "Appointment status: booked"
   }
 }
 ```
@@ -701,8 +722,7 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
     "name": "Mrs. Amina Bello",
     "phone": "+2348012345678",
     "hospital_id": "HOSP-00123",
-    "hmo_number": "HMO-456",
-    "created_at": "2026-11-21T08:55:55.926Z"
+    "hmo_number": "HMO-456"
   }
 }
 ```
@@ -743,14 +763,15 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
 ```json
 {
   "success": true,
-  "message": "Baby registered.",
+  "message": "Baby profile added successfully.",
   "data": {
     "id": "09acf693-4082-4757-83cf-afdb1afcaf19",
     "mother_id": "ce0bb2e3-a8f2-453b-89e6-921a8981b5fa",
     "name": "Baby Bello",
     "date_of_birth": "2024-11-01",
     "sex": "female",
-    "created_at": "2026-11-21T08:55:56.081Z"
+    "created_at": "2026-11-21T08:55:56.081Z",
+    "updated_at": "2026-11-21T08:55:56.081Z"
   }
 }
 ```
@@ -783,12 +804,15 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
 ```json
 {
   "success": true,
-  "message": "Baby updated.",
+  "message": "Baby profile updated.",
   "data": {
     "id": "09acf693-4082-4757-83cf-afdb1afcaf19",
+    "mother_id": "ce0bb2e3-a8f2-453b-89e6-921a8981b5fa",
     "name": "Baby Zainab Bello",
     "date_of_birth": "2024-11-01",
-    "sex": "female"
+    "sex": "female",
+    "created_at": "2026-11-21T08:55:56.081Z",
+    "updated_at": "2026-11-21T08:55:56.120Z"
   }
 }
 ```
@@ -799,7 +823,7 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
 ```json
 {
   "success": true,
-  "message": "Baby profile deleted."
+  "message": "Baby profile removed."
 }
 ```
 
@@ -1312,3 +1336,59 @@ The backend is a stateless REST API designed to power web, mobile, and kiosk fro
      - `CHECKIN_NOT_ALLOWED`: *"Check-in is only allowed on the scheduled appointment date for active bookings."*
      - `NO_SHOW_TOO_EARLY`: *"Cannot mark as no-show until the late-arrival grace period (15 minutes) has passed."*
      - `FORBIDDEN`: *"You do not have permission to perform this action."*
+
+
+---
+
+## 9. Backend Inconsistencies & Suspected Defects
+
+During the end-to-end audit against the live running Express API, the following backend implementation issues were identified where the actual backend code diverges from intended REST API design or exhibits functional bugs:
+
+### 1. `POST /api/auth/verify-otp` Omits `refreshToken` and `user` Object
+- **Location**: `backend/src/controllers/auth.controller.js` (lines 86–94)
+- **Current Behavior**: The controller calls `const token = generateToken(mother)` and returns `data: { token }`. It does not call `generateRefreshToken` and does not assemble or return the `user` object (`id`, `name`, `phone`, `role`, `is_verified`).
+- **Impact**: Clients calling `verify-otp` do not receive a persistent refresh token or user profile. The frontend is forced to decode the JWT access token in-browser to obtain `{ id, name, role }`.
+- **Recommended Backend Fix**: Align with `POST /api/auth/login`:
+  ```javascript
+  const token = generateToken(mother);
+  const refreshToken = generateRefreshToken(mother);
+  res.json({
+    success: true,
+    message: 'Phone number verified successfully.',
+    data: {
+      token,
+      refreshToken,
+      user: {
+        id: mother.id,
+        name: mother.name,
+        phone: mother.phone,
+        role: 'mother',
+        is_verified: true,
+      },
+    },
+  });
+  ```
+
+### 2. `POST /api/auth/register` Drops `hospital_id` and `hmo_number`
+- **Location**: `backend/src/controllers/auth.controller.js` (lines 13–45)
+- **Current Behavior**: The controller extracts only `{ phone, name, password, consent }` from `req.body`, omitting `hospital_id` and `hmo_number`. When inserting the new record into the `mothers` table, those columns are left unset (`NULL`).
+- **Impact**: Any `hospital_id` or `hmo_number` entered during registration is silently dropped. Mothers must re-enter them on the profile page via `PUT /api/mothers/profile`.
+- **Recommended Backend Fix**: Extract `hospital_id` and `hmo_number` from `req.body` and include them in `db('mothers').insert(...)`.
+
+### 3. Missing `GET /api/auth/me` Endpoint
+- **Location**: `backend/src/routes/auth.routes.js`
+- **Current Behavior**: Requesting `GET /api/auth/me` returns `404 NOT_FOUND`.
+- **Impact**: While mothers can inspect their own session via `GET /api/mothers/profile`, staff users (`doctor`, `midwife`, `front_desk`, `admin`) have no standard endpoint to validate their token or read their current user record.
+- **Recommended Backend Fix**: Add an authenticated `GET /api/auth/me` route that returns `{ success: true, data: { user: req.user } }`.
+
+### 4. `PUT /api/mothers/profile` Response Shape Omits `created_at`
+- **Location**: `backend/src/controllers/mother.controller.js`
+- **Current Behavior**: `GET /api/mothers/profile` returns `id`, `name`, `phone`, `hospital_id`, `hmo_number`, `created_at`, and `babies`. However, `PUT /api/mothers/profile` returns `{ id, name, phone, hospital_id, hmo_number }` without `created_at`.
+- **Impact**: Minor response asymmetry; clients updating profile data lose the `created_at` timestamp in the returned object unless refetched.
+
+### 5. String Discrepancies in Success Messages
+- `POST /api/auth/register`: Returns `"Registration successful. Please verify your phone number with the OTP sent."` (Contract originally drafted: `"Registration successful. Please enter the OTP sent to your phone."`).
+- `PUT /api/appointments/:id/cancel`: Returns `"Appointment cancelled."` (Contract originally drafted: `"Appointment cancelled successfully."`).
+- `POST /api/babies`: Returns `"Baby profile added successfully."` (Contract originally drafted: `"Baby registered."`).
+- `PUT /api/babies/:id`: Returns `"Baby profile updated."` (Contract originally drafted: `"Baby updated."`).
+- `DELETE /api/babies/:id`: Returns `"Baby profile removed."` (Contract originally drafted: `"Baby profile deleted."`).
