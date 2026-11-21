@@ -89,6 +89,16 @@ export function getLagosToday() {
 }
 
 /**
+ * Get a date N days before today in Africa/Lagos as 'YYYY-MM-DD'.
+ */
+export function getLagosDaysAgo(days = 7) {
+  const todayStr = getLagosToday();
+  const [y, m, d] = todayStr.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d - days));
+  return dt.toISOString().split('T')[0];
+}
+
+/**
  * Generate the next `count` dates (default 14) starting from today in Africa/Lagos.
  * Returns array of { date: 'YYYY-MM-DD', weekday: 'Mon', dayMonth: '22 Nov', isToday: boolean }.
  */

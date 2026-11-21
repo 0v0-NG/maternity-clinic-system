@@ -179,6 +179,7 @@ export const adminAPI = {
   getAppointmentReport: (params) => api.get('/admin/reports/appointments', { params }),
   getNoShowReport: (params) => api.get('/admin/reports/no-shows', { params }),
   getClinicLoad: (params) => api.get('/admin/reports/clinic-load', { params }),
+  getAuditLogs: (params) => api.get('/admin/audit-logs', { params }),
   blockDate: (data) => api.post('/admin/block-date', data),
   unblockDate: (clinicId, date) => api.delete(`/admin/block-date/${clinicId}/${date}`),
   cancelSession: (data) => api.post('/admin/cancel-session', data),

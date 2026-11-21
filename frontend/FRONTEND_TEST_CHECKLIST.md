@@ -830,4 +830,138 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
    - `localStorage`: `token`, `refreshToken`, `user` are all removed (`null`).
    - Browser redirects cleanly to `/login`.
 
+---
+
+## Step 7: Admin Portal (/admin)
+
+### 8.0 Role-Based Access Control & Layout Navigation
+1. **Unauthenticated Access**:
+   - Open an incognito browser window and navigate directly to `http://localhost:3000/admin`.
+   - **Expected**: Immediately redirected to `/login`.
+2. **Unauthorized Role Access**:
+   - Log in as a mother account (`08012345678` / `password123`) and navigate to `/admin`.
+   - **Expected**: Redirected to `/dashboard`.
+   - Log in as front desk staff (`+2340000000004` / `password123`) and navigate to `/admin`.
+   - **Expected**: Redirected to `/staff`.
+3. **Administrator Access**:
+   - Log in with seeded admin credentials:
+     - Phone: `+2340000000001`
+     - Password: `password123`
+   - **Expected**: Lands on `/admin`.
+   - Top bar displays:
+     - Portal title: **Admin Portal**
+     - User name: **Admin User**
+     - Role label: **System Administrator**
+     - **Log out** button.
+   - Left sidebar (desktop) displays 4 navigation items:
+     - **Dashboard**
+     - **Block dates**
+     - **Cancel session**
+     - **Audit log**
+   - On mobile screens (`< 768px`), hamburger button toggles top dropdown menu.
+
+---
+
+### 8.1 Dashboard & Operational Reports
+1. **Default View**:
+   - Click **Dashboard** in sidebar.
+   - Notice date filter defaults to **Last 7 days** up to today in Lagos time (`Africa/Lagos`).
+   - Skeleton loading cards appear briefly while metrics are queried.
+2. **Metric Summary Cards**:
+   - **Total Visits**: Aggregated total appointments across all clinics.
+   - **Completed**: Consultations finished.
+   - **Cancelled**: Appointments cancelled by patient or staff.
+   - **No-Shows**: Missed appointments.
+   - **No-Show Rate (%)**: Exact calculated percentage (`no_shows / total * 100`).
+3. **Charts**:
+   - **Appointments by Clinic**: Color-coded CSS stacked bars showing completed (green), cancelled (red), no-shows (amber), and upcoming (blue) with exact counts and legend.
+   - **Clinic Capacity & Load**: Shows booked slots vs total available slots with occupancy percentage for each specialty.
+4. **Date Filtering**:
+   - Click **Today** preset: updates cards and charts for today's live activity.
+   - Click **Last 30 days** preset: expands range to cover the last month.
+   - Adjust **From** and **To** date inputs manually and click the **Refresh** button.
+
+---
+
+### 8.2 Block & Unblock Clinic Dates
+> ⚠️ **[DATA-CHANGING TEST]**: Modifying date blocks alters real slot availability in the database.
+> **IMPORTANT**: Use a future date that has **no real test bookings** (e.g. `2026-12-25` or any date at least 7 days ahead with 0 bookings).
+
+1. Click **Block dates** in sidebar.
+2. **Live Booking Detection**:
+   - Select clinic: **Antenatal Clinic**.
+   - Pick a test date with **no active bookings** (e.g. `2026-12-25`).
+   - Notice badge displays: *"No active bookings found on this date."*.
+   - Pick a date known to have bookings (e.g. today):
+   - Notice prominent warning banner displays:
+     - *"Warning: There are X active booking(s) on this date. Blocking this date prevents future bookings but does NOT cancel existing appointments or notify mothers. To cancel existing bookings and notify mothers by SMS, please use Cancel session."*.
+3. **Blocking a Date**:
+   - Set test date back to an unused future date (e.g. `2026-12-25`).
+   - Enter reason: `Christmas Public Holiday`.
+   - Click **Block date**.
+   - Confirmation dialog opens explaining:
+     - Clinic name and date formatted as `DD/MM/YYYY`.
+     - Clarification that schedule slots become blocked (`is_blocked = true`), preventing future bookings, while existing appointments are not cancelled.
+   - Click **Confirm block**.
+   - Button shows `"Blocking..."`, modal closes, and success toast displays (e.g. *"X slots blocked on 2026-12-25"*).
+4. **Unblocking a Date**:
+   - Under the **Unblock Clinic Date** card:
+     - Select **Antenatal Clinic**.
+     - Enter the same date: `2026-12-25`.
+     - Click **Unblock date**.
+   - Confirmation dialog opens: *"Unblock Antenatal Clinic on 25/12/2026? This will re-open any unbooked slots on this day for patient bookings."*.
+   - Click **Confirm unblock**.
+   - Success toast displays: *"X slots unblocked."*.
+   - Slots immediately return to active status.
+
+---
+
+### 8.3 Cancel Session with Bulk SMS Alerts
+> ⚠️ **[DATA-CHANGING TEST]**: Cancelling a session marks appointments as `cancelled`, blocks slots, and dispatches SMS notices.
+> **IMPORTANT**: Only test on a test date with **no critical bookings** (or a single dummy booking created specifically for testing cancellation notices).
+
+1. Click **Cancel session** in sidebar.
+2. **Input Validation**:
+   - Select **Antenatal Clinic**.
+   - Select test date.
+   - Notice dynamic impact summary shows how many active bookings will be cancelled and notified.
+   - Leave the reason empty and submit: form validation blocks submission (*"A cancellation reason is required for patient SMS notices"*).
+3. **Confirmation & Safety Guard**:
+   - Enter reason: `Facility maintenance and power outage`.
+   - Click **Cancel session and notify**.
+   - Confirmation modal opens with red emergency styling:
+     - Displays clinic name and date in `DD/MM/YYYY`.
+     - Displays patient reason to be sent via SMS.
+     - Outlines consequences: all active bookings cancelled, slots blocked, automated SMS alerts sent.
+   - Click **Cancel session and notify**:
+     - Button disables and displays `"Cancelling..."`.
+     - Request `POST /api/admin/cancel-session` completes.
+     - Success banner displays with exact counts returned from API:
+       - *"Session cancelled. X appointments affected."*
+       - Clinic name, date, and SMS dispatch status.
+
+---
+
+### 8.4 Audit Log & Sensitive Data Masking
+1. Click **Audit log** in sidebar.
+2. **Table Verification**:
+   - Audit table loads newest operations first.
+   - Timestamps display in Nigerian time (`Africa/Lagos` UTC+1) with calendar date and 12-hour time (e.g. `21/11/2026, 11:21 PM`).
+   - Action badges are color-coded:
+     - Green: `LOGIN_SUCCESS`, `CREATE_STAFF`, etc.
+     - Red: `LOGIN_FAILURE`, `CANCEL_SESSION`.
+     - Amber: `BLOCK_DATE`.
+     - Blue: `BOOK_APPOINTMENT`, `CHECK_IN`, etc.
+   - User column displays truncated user UUID (e.g. `e30b148d...`) with full UUID accessible via tooltip.
+3. **Sensitive Data Masking**:
+   - Inspect the **Details** column for login, registration, or session logs.
+   - Verify that **passwords**, **JWT tokens**, **secrets**, and **OTPs** are NEVER shown in plain text and are masked as `••••••` or `••••••••`.
+4. **Filtering & Pagination**:
+   - In **Filter Action**, select `LOGIN_SUCCESS` and click **Apply** -> table shows only successful logins.
+   - Select `BLOCK_DATE` or `CANCEL_SESSION` -> displays recent date management entries.
+   - Enter a date in **Filter Date** -> table filters matching logs.
+   - Click **Reset** -> filters reset and full log history reloads.
+   - If more than 50 logs exist, click **Load more logs** -> next 50 records append to the bottom of the table.
+
+
 

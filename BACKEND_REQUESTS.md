@@ -34,3 +34,32 @@ This document tracks backend discrepancies and missing endpoints identified duri
      - Allows `front_desk` and `admin` to supply an optional `mother_id` in the request body to link the infant to that mother.
      - When called by a mother, always uses her authenticated user ID and ignores any `mother_id` in the request body.
      - Audit-logs staff baby creation as `STAFF_ADD_BABY`.
+
+---
+
+### 3. Missing Endpoint to Query Blocked Dates (`GET /api/admin/blocked-dates`)
+
+- **Current Endpoints**:
+  - `POST /api/admin/block-date`: Blocks slots for a clinic on a given date (`is_blocked = true`).
+  - `DELETE /api/admin/block-date/:clinicId/:date`: Unblocks slots for a clinic on a given date (`is_blocked = false`).
+- **Gap Identified**:
+  There is currently no read endpoint to query which dates or clinics are actively blocked (e.g. `GET /api/admin/blocked-dates` or `GET /api/admin/block-date?clinic_id=...`).
+- **Impact**:
+  The Admin Portal provides the Block Date form and the Unblock Date form, but cannot display an active list or calendar overlay of blocked dates without individually querying slots for every day.
+- **Requested Endpoint**:
+  `GET /api/admin/blocked-dates` returning:
+  ```json
+  {
+    "success": true,
+    "data": [
+      {
+        "clinic_id": "ff3280aa-8a8a-47ee-9706-23ca57c9a2ae",
+        "clinic_name": "Antenatal Clinic",
+        "date": "2026-12-25",
+        "reason": "Christmas Holiday",
+        "blocked_slots_count": 15
+      }
+    ]
+  }
+  ```
+
