@@ -7,10 +7,35 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Attach token to every request
+// Token storage follows API_CONTRACT.md Section 8:
+// - access token: sessionStorage (SPA, in-memory lifetime)
+// - refresh token: localStorage (secure client-side storage)
+let isRefreshing = false;
+let refreshSubscribers = [];
+
+const onRefreshed = (token) => {
+  refreshSubscribers.forEach((cb) => cb(token));
+  refreshSubscribers = [];
+};
+
+const addRefreshSubscriber = (cb) => {
+  refreshSubscribers.push(cb);
+};
+
+// Clear all auth storage and send the user to login
+const logoutOnAuthFailure = () => {
+  if (typeof window === 'undefined') return;
+  sessionStorage.removeItem('token');
+  localStorage.removeItem('token');
+  localStorage.removeItem('refreshToken');
+  localStorage.removeItem('user');
+  window.location.href = '/login';
+};
+
+// Attach Bearer token to every request
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token') || localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -18,17 +43,50 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Handle 401 responses
+// On 401: call refresh-token once, replay the request, otherwise log out.
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = '/login';
+    const { config } = error;
+
+    // Never retry the refresh-token endpoint itself (avoids a refresh loop).
+    if (config && config.url && config.url.includes('/auth/refresh-token')) {
+      return Promise.reject(error);
+    }
+
+    if (error.response?.status === 401 && config && !config._retry) {
+      if (isRefreshing) {
+        return new Promise((resolve) => {
+          addRefreshSubscriber((token) => {
+            config.headers.Authorization = `Bearer ${token}`;
+            resolve(api(config));
+          });
+        });
+      }
+
+      config._retry = true;
+      isRefreshing = true;
+
+      try {
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (!refreshToken) {
+          throw new Error('No refresh token available');
+        }
+        const { data } = await api.post('/auth/refresh-token', { refreshToken });
+        const newToken = data.data.token;
+        sessionStorage.setItem('token', newToken);
+        localStorage.setItem('refreshToken', refreshToken);
+        onRefreshed(newToken);
+        config.headers.Authorization = `Bearer ${newToken}`;
+        return api(config);
+      } catch (refreshErr) {
+        logoutOnAuthFailure();
+        return Promise.reject(refreshErr);
+      } finally {
+        isRefreshing = false;
       }
     }
+
     return Promise.reject(error);
   }
 );
@@ -37,6 +95,7 @@ api.interceptors.response.use(
 export const authAPI = {
   register: (data) => api.post('/auth/register', data),
   verifyOTP: (data) => api.post('/auth/verify-otp', data),
+  resendOTP: (data) => api.post('/auth/resend-otp', data),
   login: (data) => api.post('/auth/login', data),
   refreshToken: (data) => api.post('/auth/refresh-token', data),
 };
@@ -68,7 +127,7 @@ export const appointmentAPI = {
   list: (params) => api.get('/appointments', { params }),
   get: (id) => api.get(`/appointments/${id}`),
   reschedule: (id, data) => api.put(`/appointments/${id}/reschedule`, data),
-  cancel: (id) => api.put(`/appointments/${id}/cancel`),
+  cancel: (id, data) => api.put(`/appointments/${id}/cancel`, data),
   checkIn: (id) => api.post(`/appointments/${id}/checkin`),
   updateStatus: (id, data) => api.put(`/appointments/${id}/status`, data),
   bookFollowUp: (data) => api.post('/appointments/follow-up', data),

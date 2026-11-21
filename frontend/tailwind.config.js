@@ -6,35 +6,52 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Nigerian green & white palette (DESIGN)
+        // `primary` keeps its numeric keys so existing classes keep resolving,
+        // now anchored to the DESIGN primary green #008751.
         primary: {
-          50: '#f0fdf4',
-          100: '#dcfce7',
-          200: '#bbf7d0',
-          300: '#86efac',
-          400: '#4ade80',
-          500: '#22c55e',
-          600: '#16a34a',
-          700: '#15803d',
-          800: '#166534',
-          900: '#14532d',
+          50: '#E8F5EE',   // light tint
+          100: '#CDF0DA',
+          200: '#ADE5C2',
+          300: '#82DAAA',
+          400: '#57CF92',
+          500: '#008751',  // primary green
+          600: '#006E3E',
+          700: '#005A38',  // dark green
+          800: '#00472C',
+          900: '#00331E',
         },
-        accent: {
-          50: '#fdf2f8',
-          100: '#fce7f3',
-          200: '#fbcfe8',
-          300: '#f9a8d4',
-          400: '#f472b6',
-          500: '#ec4899',
-          600: '#db2777',
-          700: '#be185d',
-          800: '#9d174d',
-          900: '#831843',
+        clinic: {
+          50: '#E8F5EE',   // light tint
+          100: '#CDF0DA',
+          200: '#ADE5C2',
+          300: '#82DAAA',
+          400: '#57CF92',
+          500: '#008751',  // primary green
+          600: '#006E3E',
+          700: '#005A38',  // dark green
+          800: '#00472C',
+          900: '#00331E',
         },
+        'clinic-dark': '#005A38',
+        'clinic-tint': '#E8F5EE',
+        body: '#1F2937',        // body text
+        'body-muted': '#6B7280', // muted text
+        border: '#E5E7EB',      // borders
+        // Status colours
+        'status-waiting': '#F59E0B',      // amber = waiting
+        'status-consultation': '#14B8A6', // teal = in consultation
+        'status-booked': '#22C55E',       // soft green = booked / completed
+        'status-completed': '#22C55E',
+        'status-cancelled': '#EF4444',    // red = cancelled
+        'status-no-show': '#EF4444',      // red = no-show
+        'status-emergency': '#EF4444',    // red = emergency notice
+        'status-late': '#F59E0B',         // amber = late badge
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
       },
     },
+    plugins: [],
   },
-  plugins: [],
 };

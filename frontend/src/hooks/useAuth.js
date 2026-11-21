@@ -21,7 +21,8 @@ export function AuthProvider({ children }) {
 
   const login = async (phone, password) => {
     const { data } = await authAPI.login({ phone, password });
-    localStorage.setItem('token', data.data.token);
+    // Access token: sessionStorage (SPA in-memory lifetime); refresh token: localStorage.
+    sessionStorage.setItem('token', data.data.token);
     localStorage.setItem('refreshToken', data.data.refreshToken);
     localStorage.setItem('user', JSON.stringify(data.data.user));
     setUser(data.data.user);
@@ -29,6 +30,7 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
+    sessionStorage.removeItem('token');
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');

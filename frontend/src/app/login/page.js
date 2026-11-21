@@ -82,42 +82,44 @@ export default function LoginPage() {
           </Link>
         </p>
 
-        {/* Demo Fast Logins for Testing */}
-        <div className="mt-8 pt-6 border-t border-gray-100">
-          <p className="text-xs font-bold text-gray-400 uppercase text-center mb-3">
-            🧪 Prototype Fast Logins (1-Click)
-          </p>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <button
-              type="button"
-              onClick={() => { setPhone('+2348012345678'); setPassword('password123'); }}
-              className="p-2 border rounded-lg bg-gray-50 hover:bg-primary-50 text-left font-medium"
-            >
-              👩 Mother (Amina)
-            </button>
-            <button
-              type="button"
-              onClick={() => { setPhone('+2340000000004'); setPassword('password123'); }}
-              className="p-2 border rounded-lg bg-gray-50 hover:bg-primary-50 text-left font-medium"
-            >
-              🧑‍💼 Front Desk
-            </button>
-            <button
-              type="button"
-              onClick={() => { setPhone('+2340000000002'); setPassword('password123'); }}
-              className="p-2 border rounded-lg bg-gray-50 hover:bg-primary-50 text-left font-medium"
-            >
-              🩺 Doctor (Adebayo)
-            </button>
-            <button
-              type="button"
-              onClick={() => { setPhone('+2340000000001'); setPassword('password123'); }}
-              className="p-2 border rounded-lg bg-gray-50 hover:bg-primary-50 text-left font-medium"
-            >
-              🔧 Administrator
-            </button>
+        {/* Demo Fast Logins for Testing - only in demo mode */}
+        {process.env.NEXT_PUBLIC_DEMO_MODE === 'true' && (
+          <div className="mt-8 pt-6 border-t border-border">
+            <p className="text-xs font-bold text-body-muted uppercase text-center mb-3">
+              🧪 Prototype Fast Logins (1-Click)
+            </p>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() => { setPhone('+2348012345678'); setPassword('password123'); }}
+                className="p-2 border rounded-lg bg-primary-50 hover:bg-primary-100 text-left font-medium text-clinic-dark"
+              >
+                👩 Mother (Amina)
+              </button>
+              <button
+                type="button"
+                onClick={() => { setPhone('+2340000000004'); setPassword('password123'); }}
+                className="p-2 border rounded-lg bg-primary-50 hover:bg-primary-100 text-left font-medium text-clinic-dark"
+              >
+                🧑‍💼 Front Desk
+              </button>
+              <button
+                type="button"
+                onClick={() => { setPhone('+2340000000002'); setPassword('password123'); }}
+                className="p-2 border rounded-lg bg-primary-50 hover:bg-primary-100 text-left font-medium text-clinic-dark"
+              >
+                🩺 Doctor (Adebayo)
+              </button>
+              <button
+                type="button"
+                onClick={() => { setPhone('+2340000000001'); setPassword('password123'); }}
+                className="p-2 border rounded-lg bg-primary-50 hover:bg-primary-100 text-left font-medium text-clinic-dark"
+              >
+                🔧 Administrator
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
