@@ -225,12 +225,17 @@ const bookAppointment = async (req, res, next) => {
 const getMyAppointments = async (req, res, next) => {
   try {
     const userId = req.user.id;
-    const { status, upcoming, view } = req.query;
+    const { status, upcoming, view, date, clinic_id } = req.query;
+    const isStaff = ['front_desk', 'midwife', 'doctor', 'admin'].includes(req.user.role);
 
     let query = db('appointments')
       .join('schedule_slots', 'appointments.slot_id', 'schedule_slots.id')
       .join('clinics', 'appointments.clinic_id', 'clinics.id')
       .leftJoin('staff', 'appointments.staff_id', 'staff.id');
+
+    if (isStaff) {
+      query = query.join('mothers', 'appointments.mother_id', 'mothers.id');
+    }
 
     if (req.user.role === 'mother') {
       query = query.where('appointments.mother_id', userId);
@@ -238,31 +243,45 @@ const getMyAppointments = async (req, res, next) => {
       query = query.where('appointments.mother_id', req.query.mother_id);
     }
 
-    query = query.select(
+    const selectFields = [
       'appointments.*',
       'schedule_slots.slot_date',
       'schedule_slots.start_time',
       'schedule_slots.end_time',
       'clinics.name as clinic_name',
-      'staff.name as staff_name'
-    );
+      'staff.name as staff_name',
+    ];
 
-    // Determine view: 'upcoming' (default) vs 'past'
-    const isPast = view === 'past' || upcoming === 'false';
-    const today = getLagosToday();
+    if (isStaff) {
+      selectFields.push('mothers.name as mother_name', 'mothers.phone as mother_phone');
+    }
 
-    if (isPast) {
-      // Past returns attended ('completed'), cancelled, and no-show appointments, or past dates
-      query = query.where(function () {
-        this.whereIn('appointments.status', ['completed', 'cancelled', 'no_show'])
-          .orWhere('schedule_slots.slot_date', '<', today);
-      });
+    query = query.select(selectFields);
+
+    if (clinic_id) {
+      query = query.where('appointments.clinic_id', clinic_id);
+    }
+
+    if (date) {
+      query = query.where('schedule_slots.slot_date', date);
     } else {
-      // Default: upcoming appointments (active/booked from today forward)
-      query = query.where(function () {
-        this.whereNotIn('appointments.status', ['completed', 'cancelled', 'no_show'])
-          .andWhere('schedule_slots.slot_date', '>=', today);
-      });
+      // Determine view: 'upcoming' (default) vs 'past'
+      const isPast = view === 'past' || upcoming === 'false';
+      const today = getLagosToday();
+
+      if (isPast) {
+        // Past returns attended ('completed'), cancelled, and no-show appointments, or past dates
+        query = query.where(function () {
+          this.whereIn('appointments.status', ['completed', 'cancelled', 'no_show'])
+            .orWhere('schedule_slots.slot_date', '<', today);
+        });
+      } else {
+        // Default: upcoming appointments (active/booked from today forward)
+        query = query.where(function () {
+          this.whereNotIn('appointments.status', ['completed', 'cancelled', 'no_show'])
+            .andWhere('schedule_slots.slot_date', '>=', today);
+        });
+      }
     }
 
     if (status) query = query.where('appointments.status', status);
@@ -295,20 +314,33 @@ const getMyAppointments = async (req, res, next) => {
  */
 const getAppointment = async (req, res, next) => {
   try {
-    const appointment = await db('appointments')
+    const isStaff = ['front_desk', 'midwife', 'doctor', 'admin'].includes(req.user.role);
+
+    let query = db('appointments')
       .join('schedule_slots', 'appointments.slot_id', 'schedule_slots.id')
       .join('clinics', 'appointments.clinic_id', 'clinics.id')
-      .leftJoin('staff', 'appointments.staff_id', 'staff.id')
-      .where('appointments.id', req.params.id)
-      .select(
-        'appointments.*',
-        'schedule_slots.slot_date',
-        'schedule_slots.start_time',
-        'schedule_slots.end_time',
-        'clinics.name as clinic_name',
-        'staff.name as staff_name'
-      )
-      .first();
+      .leftJoin('staff', 'appointments.staff_id', 'staff.id');
+
+    if (isStaff) {
+      query = query.join('mothers', 'appointments.mother_id', 'mothers.id');
+    }
+
+    query = query.where('appointments.id', req.params.id);
+
+    const selectFields = [
+      'appointments.*',
+      'schedule_slots.slot_date',
+      'schedule_slots.start_time',
+      'schedule_slots.end_time',
+      'clinics.name as clinic_name',
+      'staff.name as staff_name',
+    ];
+
+    if (isStaff) {
+      selectFields.push('mothers.name as mother_name', 'mothers.phone as mother_phone');
+    }
+
+    const appointment = await query.select(selectFields).first();
 
     if (!appointment) throw new AppError('Appointment not found.', 404, 'NOT_FOUND');
 

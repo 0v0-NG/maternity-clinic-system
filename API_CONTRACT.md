@@ -463,11 +463,11 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
   - `clinic_id` (string, optional): Filter by clinic UUID
 - **Behavior**:
   - Mothers see only their own appointments.
-  - Staff see appointments matching the query filters.
+  - Staff (`front_desk`, `midwife`, `doctor`, `admin`) see appointments matching the query filters, with `mother_name` and `mother_phone` included on every appointment item.
   - Returns appointment objects including `late_arrival` (boolean) and linked `babies` array.
   - `?view=past` returns `completed`, `cancelled`, and `no_show` appointments, ordered newest first.
   - Appointments are **never deleted**; there is no delete endpoint.
-- **Success Response (200 OK)**:
+- **Success Response (200 OK - Staff Caller)**:
 ```json
 {
   "success": true,
@@ -475,6 +475,8 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
     {
       "id": "fd6fecc4-5081-496b-a87b-3b07fac31aa0",
       "mother_id": "733f2137-1db1-4534-9153-dc210ef1b444",
+      "mother_name": "Amina Bello",
+      "mother_phone": "+2348012345678",
       "clinic_id": "ff3280aa-8a8a-47ee-9706-23ca57c9a2ae",
       "staff_id": "70d3ed92-1c9a-4906-995e-0b2e875d253f",
       "slot_id": "60d93bc9-7123-47b4-92d2-472b43008b4d",
@@ -734,6 +736,64 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
 }
 ```
 
+#### `GET /api/mothers/search`
+- **Role**: `front_desk`, `admin`
+- **Query**:
+  - `q` (string, required): Search query, minimum 3 characters.
+- **Description**: Searches mothers by partial phone number (matching normalized Nigerian phone digits) or by name (case-insensitive substring contains). Returns maximum 20 results. An audit log entry (`STAFF_SEARCH_MOTHERS`) is created recording only the result count (never the search text).
+- **Success Response (200 OK)**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "ce0bb2e3-a8f2-453b-89e6-921a8981b5fa",
+      "name": "Mrs. Amina Bello",
+      "phone": "+2348012345678",
+      "hospital_id": "HOSP-00123",
+      "hmo_number": "HMO-456",
+      "registered_by_staff": false,
+      "babies": [
+        {
+          "id": "09acf693-4082-4757-83cf-afdb1afcaf19",
+          "name": "Baby Bello",
+          "date_of_birth": "2024-11-01",
+          "sex": "female"
+        }
+      ]
+    }
+  ]
+}
+```
+- **Error Codes**: `VALIDATION_ERROR` (422, query shorter than 3 characters), `FORBIDDEN` (403, non-staff caller).
+
+#### `POST /api/mothers`
+- **Role**: `front_desk`, `admin`
+- **Body**:
+  - `name` (string, required): Patient name
+  - `phone` (string, required): Nigerian phone number formatted to international format
+  - `hospital_id` (string, optional, max 50 chars)
+  - `hmo_number` (string, optional, max 50 chars)
+  - `consent_confirmed` (boolean, required, must be `true`): Confirmation that verbal consent was obtained
+- **Description**: Registers a patient in-person at the front desk. Creates a verified mother record (`is_verified: true`, `consent_at: now`, `registered_by_staff: true`) with an unusable random password hash (cannot log in until registering an online account, but can receive SMS reminders). Audit logged as `CREATE_MOTHER_BY_STAFF`.
+- **Success Response (201 Created)**:
+```json
+{
+  "success": true,
+  "message": "Patient registered successfully.",
+  "data": {
+    "id": "ce0bb2e3-a8f2-453b-89e6-921a8981b5fa",
+    "name": "Mrs. Amina Bello",
+    "phone": "+2348012345678",
+    "hospital_id": "HOSP-00123",
+    "hmo_number": "HMO-456",
+    "registered_by_staff": true,
+    "created_at": "2026-11-21T08:55:55.926Z"
+  }
+}
+```
+- **Error Codes**: `CONSENT_REQUIRED` (400, missing or false verbal consent confirmation), `CONFLICT` (409, duplicate phone number), `VALIDATION_ERROR` (422).
+
 #### `GET /api/mothers/:id`
 - **Role**: `front_desk`, `midwife`, `doctor`, `admin`
 - **Description**: Returns mother profile and babies. Automatically writes an audit log entry (`STAFF_VIEW_MOTHER_PROFILE`).
@@ -761,11 +821,13 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
 ```
 
 #### `POST /api/babies`
-- **Role**: `mother`
+- **Role**: `mother`, `front_desk`, `admin`
 - **Body**:
   - `name` (string, required): Baby name
   - `date_of_birth` (string/date, required): Format `YYYY-MM-DD`
   - `sex` (string, required): `"male"` or `"female"`
+  - `mother_id` (string/UUID, optional for staff): When called by staff (`front_desk`, `admin`), associates the baby with the specified mother. When called by a mother, always uses her own ID and ignores any `mother_id` provided.
+- **Description**: Creates a baby profile. When created by staff, an audit log entry (`STAFF_ADD_BABY`) is written.
 - **Success Response (201 Created)**:
 ```json
 {
@@ -1221,6 +1283,9 @@ The tables below map every user screen action to its corresponding backend endpo
 | View Specific Patient Queue Position | `GET` | `/api/queue/position/:appointmentId` | `front_desk` |
 | Mark Patient as No-Show (after grace period) | `PUT` | `/api/appointments/:id/status` | `front_desk` (`status: "no_show"` only) |
 | Lookup Mother Profile & Babies | `GET` | `/api/mothers/:id` | `front_desk` |
+| Search Patients by Name / Phone | `GET` | `/api/mothers/search?q=` | `front_desk` |
+| Register Walk-in Mother at Desk | `POST` | `/api/mothers` | `front_desk` |
+| Add Baby for Mother | `POST` | `/api/babies` | `front_desk` |
 | Reschedule Appointment on Mother's Behalf | `PUT` | `/api/appointments/:id/reschedule` | `front_desk` |
 | Cancel Appointment on Mother's Behalf | `PUT` | `/api/appointments/:id/cancel` | `front_desk` |
 

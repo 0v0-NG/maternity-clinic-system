@@ -8,7 +8,7 @@ const router = Router();
 
 router.use(authenticate);
 
-// Mother books an appointment
+// Mother books an appointment (or staff booking on mother's behalf)
 router.post(
   '/',
   validate([
@@ -16,6 +16,7 @@ router.post(
     body('clinic_id').notEmpty().withMessage('Clinic ID is required.'),
     body('booking_type').optional().isString(),
     body('baby_ids').optional().isArray(),
+    body('mother_id').optional().isUUID().withMessage('Valid mother ID is required if provided.'),
   ]),
   appointmentController.bookAppointment
 );

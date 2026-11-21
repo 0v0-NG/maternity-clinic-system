@@ -9,17 +9,45 @@ const { AppError } = require('../middleware/errorHandler');
 const addBaby = async (req, res, next) => {
   try {
     const { name, date_of_birth, sex } = req.body;
+    const isStaff = ['front_desk', 'admin', 'midwife', 'doctor'].includes(req.user.role);
+
+    let targetMotherId = req.user.id;
+    if (isStaff) {
+      if (req.body.mother_id) {
+        const mother = await db('mothers').where('id', req.body.mother_id).first();
+        if (!mother) {
+          throw new AppError('Mother not found.', 404, 'NOT_FOUND');
+        }
+        targetMotherId = req.body.mother_id;
+      } else {
+        throw new AppError('Mother ID is required when staff creates a baby.', 422, 'VALIDATION_ERROR');
+      }
+    } else {
+      // Mother always uses her own id; ignore any mother_id sent
+      targetMotherId = req.user.id;
+    }
 
     const id = generateId();
     await db('babies')
       .insert({
         id,
-        mother_id: req.user.id,
+        mother_id: targetMotherId,
         name,
         date_of_birth,
         sex,
         created_at: new Date(),
       });
+
+    if (isStaff) {
+      await db('audit_logs').insert({
+        id: generateId(),
+        user_id: req.user.id,
+        action: 'STAFF_ADD_BABY',
+        details: JSON.stringify({ staffId: req.user.id, motherId: targetMotherId, babyId: id }),
+        created_at: new Date(),
+      });
+    }
+
     const baby = await db('babies').where('id', id).first();
 
     res.status(201).json({

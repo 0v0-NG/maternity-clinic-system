@@ -172,7 +172,7 @@ const login = async (req, res, next) => {
         details: JSON.stringify({ phone: formattedPhone, reason: 'User not found' }),
         created_at: new Date(),
       }).catch(() => {});
-      throw new AppError('Invalid phone number or password.', 401, 'UNAUTHORIZED');
+      throw new AppError('Invalid phone number or password.', 401, 'INVALID_CREDENTIALS');
     }
 
     // Check password
@@ -185,7 +185,7 @@ const login = async (req, res, next) => {
         details: JSON.stringify({ phone: formattedPhone, role, reason: 'Invalid password' }),
         created_at: new Date(),
       }).catch(() => {});
-      throw new AppError('Invalid phone number or password.', 401, 'UNAUTHORIZED');
+      throw new AppError('Invalid phone number or password.', 401, 'INVALID_CREDENTIALS');
     }
 
     // Check if mother account is verified

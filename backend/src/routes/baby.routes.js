@@ -14,6 +14,7 @@ router.post(
     body('name').trim().notEmpty().withMessage('Baby name is required.'),
     body('date_of_birth').isDate().withMessage('Valid date of birth is required.'),
     body('sex').isIn(['male', 'female']).withMessage('Sex must be male or female.'),
+    body('mother_id').optional().isUUID().withMessage('Valid mother ID is required if provided.'),
   ]),
   babyController.addBaby
 );
