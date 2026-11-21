@@ -39,15 +39,34 @@ const errorHandler = (err, req, res, next) => {
     });
   }
 
-  // Knex / PostgreSQL errors
-  if (err.code === '23505') {
+  // Knex / PostgreSQL / SQLite unique constraint violations
+  const isUniqueViolation =
+    err.code === '23505' ||
+    err.code === 'SQLITE_CONSTRAINT' ||
+    err.code === 'SQLITE_CONSTRAINT_UNIQUE' ||
+    (err.message && err.message.toLowerCase().includes('unique constraint'));
+
+  if (isUniqueViolation) {
+    const isSlotConstraint =
+      (err.constraint && (err.constraint.includes('slot') || err.constraint.includes('idx_appointments_slot_active'))) ||
+      (err.detail && err.detail.includes('slot_id')) ||
+      (err.message && (
+        err.message.includes('slot_id') ||
+        err.message.includes('idx_appointments_slot_active')
+      ));
+
+    const code = isSlotConstraint ? 'SLOT_TAKEN' : 'CONFLICT';
+    const message = isSlotConstraint
+      ? 'This slot is already booked. Please choose another.'
+      : 'A record with this information already exists.';
+
     return res.status(409).json({
       success: false,
       error: {
-        code: 'CONFLICT',
-        message: 'A record with this information already exists.',
+        code,
+        message,
       },
-      message: 'A record with this information already exists.',
+      message,
     });
   }
 

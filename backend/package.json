@@ -7,6 +7,7 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "jest --coverage",
+    "test:concurrency": "node scripts/testConcurrency.js",
     "db:check": "node scripts/dbCheck.js",
     "smoke": "node scripts/smoke.js",
     "migrate": "knex migrate:latest",

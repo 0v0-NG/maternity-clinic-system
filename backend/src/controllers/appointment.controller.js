@@ -22,7 +22,15 @@ const bookAppointment = async (req, res, next) => {
 
     // Use a transaction with row-level locking to prevent double-booking
     const result = await db.transaction(async (trx) => {
-      // Lock the slot row
+      // 1. Lock the mother's row first to serialize concurrent requests from the same mother
+      const motherLock = await trx('mothers')
+        .where('id', mother_id)
+        .forUpdate()
+        .first();
+
+      if (!motherLock) throw new AppError('Mother not found.', 404, 'NOT_FOUND');
+
+      // 2. Lock the slot row
       const slot = await trx('schedule_slots')
         .where('id', slot_id)
         .forUpdate()
@@ -36,10 +44,10 @@ const bookAppointment = async (req, res, next) => {
         throw new AppError('This slot is reserved for walk-in patients.', 400, 'SLOT_RESERVED');
       }
 
-      // Check if slot is already taken
+      // Check if slot is already taken by any non-cancelled appointment
       const existingBooking = await trx('appointments')
         .where('slot_id', slot_id)
-        .whereIn('status', ['booked', 'checked_in'])
+        .where('status', '!=', 'cancelled')
         .first();
 
       if (existingBooking) {
@@ -51,7 +59,7 @@ const bookAppointment = async (req, res, next) => {
         .join('schedule_slots', 'appointments.slot_id', 'schedule_slots.id')
         .where('appointments.mother_id', mother_id)
         .where('schedule_slots.slot_date', slot.slot_date)
-        .whereIn('appointments.status', ['booked', 'checked_in'])
+        .where('appointments.status', '!=', 'cancelled')
         .where(function () {
           this.where('schedule_slots.start_time', '<', slot.end_time)
             .andWhere('schedule_slots.end_time', '>', slot.start_time);
@@ -126,6 +134,19 @@ const bookAppointment = async (req, res, next) => {
       data: result,
     });
   } catch (error) {
+    if (
+      error.code === '23505' ||
+      error.code === 'SQLITE_CONSTRAINT' ||
+      error.code === 'SQLITE_CONSTRAINT_UNIQUE' ||
+      (error.message && (
+        error.message.includes('idx_appointments_slot_active') ||
+        error.message.includes('appointments.slot_id') ||
+        error.message.includes('UNIQUE constraint failed') ||
+        error.message.includes('unique constraint')
+      ))
+    ) {
+      return next(new AppError('This slot is already booked. Please choose another.', 409, 'SLOT_TAKEN'));
+    }
     next(error);
   }
 };
@@ -262,6 +283,11 @@ const rescheduleAppointment = async (req, res, next) => {
 
     // Book the new slot (with locking)
     await db.transaction(async (trx) => {
+      // 1. Lock the mother's row first to serialize concurrent requests
+      const motherLock = await trx('mothers').where('id', appointment.mother_id).forUpdate().first();
+      if (!motherLock) throw new AppError('Mother not found.', 404, 'NOT_FOUND');
+
+      // 2. Lock the new slot row
       const newSlot = await trx('schedule_slots').where('id', new_slot_id).forUpdate().first();
       if (!newSlot) throw new AppError('New slot not found.', 404, 'NOT_FOUND');
       if (newSlot.is_blocked) throw new AppError('This slot is blocked.', 400, 'BAD_REQUEST');
@@ -271,7 +297,7 @@ const rescheduleAppointment = async (req, res, next) => {
 
       const taken = await trx('appointments')
         .where('slot_id', new_slot_id)
-        .whereIn('status', ['booked', 'checked_in'])
+        .where('status', '!=', 'cancelled')
         .first();
       if (taken) throw new AppError('New slot is already booked.', 409, 'SLOT_TAKEN');
 
@@ -281,7 +307,7 @@ const rescheduleAppointment = async (req, res, next) => {
         .where('appointments.mother_id', appointment.mother_id)
         .where('appointments.id', '!=', req.params.id)
         .where('schedule_slots.slot_date', newSlot.slot_date)
-        .whereIn('appointments.status', ['booked', 'checked_in'])
+        .where('appointments.status', '!=', 'cancelled')
         .where(function () {
           this.where('schedule_slots.start_time', '<', newSlot.end_time)
             .andWhere('schedule_slots.end_time', '>', newSlot.start_time);
@@ -328,6 +354,19 @@ const rescheduleAppointment = async (req, res, next) => {
 
     res.json({ success: true, message: 'Appointment rescheduled successfully.' });
   } catch (error) {
+    if (
+      error.code === '23505' ||
+      error.code === 'SQLITE_CONSTRAINT' ||
+      error.code === 'SQLITE_CONSTRAINT_UNIQUE' ||
+      (error.message && (
+        error.message.includes('idx_appointments_slot_active') ||
+        error.message.includes('appointments.slot_id') ||
+        error.message.includes('UNIQUE constraint failed') ||
+        error.message.includes('unique constraint')
+      ))
+    ) {
+      return next(new AppError('New slot is already booked.', 409, 'SLOT_TAKEN'));
+    }
     next(error);
   }
 };

@@ -70,7 +70,7 @@ async function request(endpoint, options = {}) {
 async function runSmokeTest() {
   console.log(`Starting smoke test against ${BASE_URL}...\n`);
   let passedCount = 0;
-  let totalSteps = 10;
+  let totalSteps = 12;
 
   try {
     // 1. Register Mother
@@ -204,33 +204,77 @@ async function runSmokeTest() {
     }
     const adminToken = adminLoginRes.data.data.token;
 
-    // 6. Check In (Front Desk / Admin)
+    // 6. Walk-in Slots Filtering Check
+    const motherSlotsRes = await request(`/clinics/${clinic.id}/slots?date=${selectedSlot.slot_date}`, {
+      headers: { Authorization: `Bearer ${motherToken}` },
+    });
+    const motherSlots = motherSlotsRes.data?.data?.availableSlots || [];
+    const motherHasWalkin = motherSlots.some((s) => s.is_walkin);
+
+    const staffSlotsRes = await request(`/clinics/${clinic.id}/slots?date=${selectedSlot.slot_date}`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    const staffSlots = staffSlotsRes.data?.data?.availableSlots || [];
+    const staffHasWalkin = staffSlots.some((s) => s.is_walkin);
+
+    if (motherHasWalkin || !staffHasWalkin) {
+      console.log(`[FAIL] Step 6: Walk-in Slot Filtering - Mother saw walkin: ${motherHasWalkin}, Staff saw walkin: ${staffHasWalkin}`);
+      process.exit(1);
+    }
+    console.log('[PASS] Step 6: Walk-in Slot Filtering (Excluded for mother, included for front desk)');
+    passedCount++;
+
+    // 7. Ownership Check (Second mother gets 403 on reading first mother's appointment)
+    const testPhone2 = `080${Math.floor(10000000 + Math.random() * 90000000)}`;
+    const reg2Res = await request('/auth/register', {
+      method: 'POST',
+      body: { phone: testPhone2, name: 'Smoke Mother Two', password: 'Password123!', consent: true },
+    });
+    const { motherId: m2Id, pinId: p2Id, demoOtp: otp2 } = reg2Res.data.data;
+    const verify2Res = await request('/auth/verify-otp', {
+      method: 'POST',
+      body: { motherId: m2Id, pinId: p2Id, otp: otp2 || '123456' },
+    });
+    const mother2Token = verify2Res.data.data.token;
+
+    const crossReadRes = await request(`/appointments/${appointmentId}`, {
+      headers: { Authorization: `Bearer ${mother2Token}` },
+    });
+
+    if (crossReadRes.status !== 403 || crossReadRes.data?.error?.code !== 'FORBIDDEN') {
+      console.log(`[FAIL] Step 7: Ownership Check - Status ${crossReadRes.status}: ${JSON.stringify(crossReadRes.data)}`);
+      process.exit(1);
+    }
+    console.log('[PASS] Step 7: Ownership Check (Second mother received 403 FORBIDDEN)');
+    passedCount++;
+
+    // 8. Check In (Front Desk / Admin)
     const checkinRes = await request(`/appointments/${appointmentId}/checkin`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${adminToken}` },
     });
 
     if (checkinRes.status !== 200 || !checkinRes.data?.data?.queueNumber) {
-      console.log(`[FAIL] Step 6: Check In - Status ${checkinRes.status}: ${JSON.stringify(checkinRes.data)}`);
+      console.log(`[FAIL] Step 8: Check In - Status ${checkinRes.status}: ${JSON.stringify(checkinRes.data)}`);
       process.exit(1);
     }
     const queueNumber = checkinRes.data.data.queueNumber;
-    console.log(`[PASS] Step 6: Check In (Assigned ${queueNumber})`);
+    console.log(`[PASS] Step 8: Check In (Assigned ${queueNumber})`);
     passedCount++;
 
-    // 7. Queue Position
+    // 9. Queue Position
     const queueRes = await request(`/queue/position/${appointmentId}`, {
       headers: { Authorization: `Bearer ${motherToken}` },
     });
 
     if (queueRes.status !== 200 || typeof queueRes.data?.data?.position !== 'number') {
-      console.log(`[FAIL] Step 7: Queue Position - Status ${queueRes.status}: ${JSON.stringify(queueRes.data)}`);
+      console.log(`[FAIL] Step 9: Queue Position - Status ${queueRes.status}: ${JSON.stringify(queueRes.data)}`);
       process.exit(1);
     }
-    console.log(`[PASS] Step 7: Queue Position (Position: ${queueRes.data.data.position})`);
+    console.log(`[PASS] Step 9: Queue Position (Position: ${queueRes.data.data.position})`);
     passedCount++;
 
-    // 8. Mark In Consultation (Midwife / Doctor / Admin)
+    // 10. Mark In Consultation (Midwife / Doctor / Admin)
     const consultRes = await request(`/appointments/${appointmentId}/status`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${adminToken}` },
@@ -238,13 +282,13 @@ async function runSmokeTest() {
     });
 
     if (consultRes.status !== 200) {
-      console.log(`[FAIL] Step 8: Mark In Consultation - Status ${consultRes.status}: ${JSON.stringify(consultRes.data)}`);
+      console.log(`[FAIL] Step 10: Mark In Consultation - Status ${consultRes.status}: ${JSON.stringify(consultRes.data)}`);
       process.exit(1);
     }
-    console.log('[PASS] Step 8: Mark In Consultation');
+    console.log('[PASS] Step 10: Mark In Consultation');
     passedCount++;
 
-    // 9. Mark Completed
+    // 11. Mark Completed
     const completeRes = await request(`/appointments/${appointmentId}/status`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${adminToken}` },
@@ -252,22 +296,22 @@ async function runSmokeTest() {
     });
 
     if (completeRes.status !== 200) {
-      console.log(`[FAIL] Step 9: Mark Completed - Status ${completeRes.status}: ${JSON.stringify(completeRes.data)}`);
+      console.log(`[FAIL] Step 11: Mark Completed - Status ${completeRes.status}: ${JSON.stringify(completeRes.data)}`);
       process.exit(1);
     }
-    console.log('[PASS] Step 9: Mark Completed');
+    console.log('[PASS] Step 11: Mark Completed');
     passedCount++;
 
-    // 10. Admin Report
+    // 12. Admin Report
     const reportRes = await request('/admin/reports/appointments', {
       headers: { Authorization: `Bearer ${adminToken}` },
     });
 
     if (reportRes.status !== 200 || !Array.isArray(reportRes.data?.data?.clinics)) {
-      console.log(`[FAIL] Step 10: Admin Report - Status ${reportRes.status}: ${JSON.stringify(reportRes.data)}`);
+      console.log(`[FAIL] Step 12: Admin Report - Status ${reportRes.status}: ${JSON.stringify(reportRes.data)}`);
       process.exit(1);
     }
-    console.log('[PASS] Step 10: Admin Report');
+    console.log('[PASS] Step 12: Admin Report');
     passedCount++;
 
     console.log(`\n========================================`);
