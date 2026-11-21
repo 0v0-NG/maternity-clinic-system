@@ -165,9 +165,7 @@ export default function BookAppointmentPage() {
       const addedBaby = res?.data?.data;
       if (addedBaby) {
         setBabies((prev) => [...prev, addedBaby]);
-        // Automatically select the newly created baby
-        setSelectedBabies((prev) => [...prev, addedBaby.id]);
-        toast.success('Baby profile added and selected!');
+        toast.success('Baby profile added!');
       }
       // Reset form
       setNewBabyName('');
@@ -345,15 +343,10 @@ export default function BookAppointmentPage() {
           </Card>
 
           {/* Action Buttons */}
-          <div className="space-y-3">
+          <div>
             <Link href={`/appointments/${createdAppointment.id}`} className="block">
               <Button variant="primary" className="w-full text-sm">
-                View Appointment
-              </Button>
-            </Link>
-            <Link href="/dashboard" className="block">
-              <Button variant="outline" className="w-full text-sm">
-                Home
+                View appointment
               </Button>
             </Link>
           </div>
@@ -507,19 +500,10 @@ export default function BookAppointmentPage() {
                         {/* Baby Selection (When "baby" or "both") */}
                         {(bookingType === 'baby' || bookingType === 'both') && (
                           <div className="bg-white border border-border rounded-xl p-4 space-y-3">
-                            <div className="flex items-center justify-between">
+                            <div>
                               <span className="text-xs font-bold text-body">
-                                Select Baby (One or more for twins):
+                                Select baby (one or more for twins)
                               </span>
-                              {!showAddBabyForm && (
-                                <button
-                                  type="button"
-                                  onClick={() => setShowAddBabyForm(true)}
-                                  className="text-xs font-semibold text-primary-600 hover:text-primary-700 flex items-center gap-1"
-                                >
-                                  <Plus size={14} /> Add Baby
-                                </button>
-                              )}
                             </div>
 
                             {/* Existing Babies Checkbox List */}
@@ -556,6 +540,20 @@ export default function BookAppointmentPage() {
                               </div>
                             )}
 
+                            {/* Under the list: "Add another baby" button that reopens the mini form */}
+                            {babies.length > 0 && !showAddBabyForm && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowAddBabyForm(true);
+                                  setAddBabyError('');
+                                }}
+                                className="text-xs font-semibold text-primary-600 hover:text-primary-700 flex items-center gap-1.5 py-1"
+                              >
+                                <Plus size={14} /> Add another baby
+                              </button>
+                            )}
+
                             {/* Inline Mini Form for Adding Baby */}
                             {(babies.length === 0 || showAddBabyForm) && (
                               <div className="bg-clinic-50 border border-primary-200 rounded-xl p-4 space-y-3">
@@ -566,7 +564,10 @@ export default function BookAppointmentPage() {
                                   {babies.length > 0 && (
                                     <button
                                       type="button"
-                                      onClick={() => setShowAddBabyForm(false)}
+                                      onClick={() => {
+                                        setShowAddBabyForm(false);
+                                        setAddBabyError('');
+                                      }}
                                       className="text-xs text-body-muted hover:text-body"
                                     >
                                       Cancel
@@ -632,7 +633,7 @@ export default function BookAppointmentPage() {
                                     disabled={isSavingBaby}
                                     className="w-full h-10 text-xs mt-2"
                                   >
-                                    {isSavingBaby ? 'Saving Baby...' : 'Save & Select Baby'}
+                                    {isSavingBaby ? 'Saving...' : 'Save'}
                                   </Button>
                                 </div>
                               </div>

@@ -241,7 +241,7 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
    - Success screen loads with green checkmark and header *"Booking Confirmed!"*.
    - Summary card displays clinic, date, time, and attendee.
    - Notice: *"SMS reminders will be sent to your registered phone number 24 hours and 2 hours before your appointment."*.
-   - Click **Home** -> Navigates to `/dashboard`, where the Next Appointment card reflects the newly booked Antenatal visit.
+   - Click **View appointment** -> Navigates to `/appointments/[id]` with full details (or click Home in the bottom navigation).
 
 ---
 
@@ -279,9 +279,12 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
      - Baby's Name: `Amara Bello`
      - Date of Birth: Pick a past date (e.g. `2024-05-15`)
      - Sex: `Female`
-     - Click **Save & Select Baby**.
-     - Toast: *"Baby profile added and selected!"*.
-     - Mini form closes and `Amara Bello` is listed and **checked automatically**.
+     - Click **Save**.
+   - Toast: *"Baby profile added!"*.
+   - Mini form closes and `Amara Bello` is added to the list as a card with an unticked checkbox.
+   - Under the list, an **Add another baby** button appears.
+   - Notice indicates *"Please select or add at least one baby to continue."*, and **Next** remains disabled.
+   - Tick the checkbox for `Amara Bello`.
    - With at least one baby checked, **Next** becomes enabled.
    - Click **Next**.
 3. **Step 2 & 3**:
@@ -297,11 +300,11 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
 2. **Step 1 - Clinic & Who It Is For**:
    - Select **Postnatal Clinic**.
    - Select **Me & my baby** (`booking_type = "both"`).
-   - Click **+ Add Baby** to register a second twin:
+   - Click **Add another baby** under the list to reopen the mini form:
      - Name: `Zainab Bello`
      - Date of Birth: `2024-05-15`
      - Sex: `Female`
-     - Click **Save & Select Baby**.
+     - Click **Save**.
    - Now in the baby checklist, ensure **both** checkboxes are ticked:
      - [x] `Amara Bello`
      - [x] `Zainab Bello`
