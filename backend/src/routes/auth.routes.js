@@ -13,6 +13,9 @@ router.post(
     body('password')
       .isLength({ min: 6 })
       .withMessage('Password must be at least 6 characters.'),
+    body('consent')
+      .custom((val) => val === true || val === 'true')
+      .withMessage('Consent under the Nigeria Data Protection Act 2023 is required.'),
   ]),
   authController.register
 );

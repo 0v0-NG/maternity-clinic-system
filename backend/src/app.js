@@ -2,7 +2,9 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const config = require('./config');
 const { errorHandler } = require('./middleware/errorHandler');
+const clinicInfo = require('./config/clinicInfo');
 
 // Route imports
 const authRoutes = require('./routes/auth.routes');
@@ -17,7 +19,18 @@ const app = express();
 
 // --- Global Middleware ---
 app.use(helmet());
-app.use(cors());
+
+// CORS configuration (configurable via CORS_ORIGIN, defaults to http://localhost:3000)
+const allowedOrigins = config.corsOrigin === '*'
+  ? '*'
+  : config.corsOrigin.split(',').map((o) => o.trim());
+
+app.use(
+  cors({
+    origin: allowedOrigins,
+    credentials: true,
+  })
+);
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -69,10 +82,22 @@ app.get('/api/emergency-notice', (req, res) => {
   });
 });
 
+// --- Public Clinic Information ---
+app.get('/api/clinic-info', (req, res) => {
+  res.json({
+    success: true,
+    data: clinicInfo,
+  });
+});
+
 // --- 404 Handler ---
 app.use((req, res) => {
   res.status(404).json({
     success: false,
+    error: {
+      code: 'NOT_FOUND',
+      message: `Route ${req.method} ${req.originalUrl} not found.`,
+    },
     message: `Route ${req.method} ${req.originalUrl} not found.`,
   });
 });

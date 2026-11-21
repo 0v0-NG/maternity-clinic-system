@@ -8,6 +8,7 @@ module.exports = {
   // Server
   port: parseInt(process.env.PORT, 10) || 5000,
   nodeEnv: process.env.NODE_ENV || 'development',
+  corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3000',
 
   // Database
   db: {

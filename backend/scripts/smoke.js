@@ -81,6 +81,7 @@ async function runSmokeTest() {
         phone: testPhone,
         name: 'Smoke Test Mother',
         password: 'Password123!',
+        consent: true,
       },
     });
 

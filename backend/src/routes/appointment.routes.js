@@ -62,10 +62,13 @@ router.post(
   '/follow-up',
   authorize('midwife', 'doctor', 'front_desk', 'admin'),
   validate([
-    body('mother_id').notEmpty(),
-    body('clinic_id').notEmpty(),
-    body('slot_id').notEmpty(),
-    body('booking_type').isIn(['mother', 'baby', 'both']),
+    body('mother_id').notEmpty().withMessage('Mother ID is required.'),
+    body('clinic_id').notEmpty().withMessage('Clinic ID is required.'),
+    body('slot_id').notEmpty().withMessage('Slot ID is required.'),
+    body('booking_type')
+      .isIn(['mother', 'baby', 'both'])
+      .withMessage('Booking type must be mother, baby, or both.'),
+    body('baby_ids').optional().isArray(),
   ]),
   appointmentController.bookFollowUp
 );

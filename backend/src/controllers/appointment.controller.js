@@ -21,8 +21,8 @@ const bookAppointment = async (req, res, next) => {
         .forUpdate()
         .first();
 
-      if (!slot) throw new AppError('Slot not found.', 404);
-      if (slot.is_blocked) throw new AppError('This slot is blocked.', 400);
+      if (!slot) throw new AppError('Slot not found.', 404, 'NOT_FOUND');
+      if (slot.is_blocked) throw new AppError('This slot is blocked.', 400, 'BAD_REQUEST');
 
       // Check if slot is already taken
       const existingBooking = await trx('appointments')
@@ -31,7 +31,7 @@ const bookAppointment = async (req, res, next) => {
         .first();
 
       if (existingBooking) {
-        throw new AppError('This slot is already booked. Please choose another.', 409);
+        throw new AppError('This slot is already booked. Please choose another.', 409, 'SLOT_TAKEN');
       }
 
       // Check if mother already has an overlapping appointment
@@ -47,7 +47,7 @@ const bookAppointment = async (req, res, next) => {
         .first();
 
       if (overlapping) {
-        throw new AppError('You already have an appointment during this time.', 409);
+        throw new AppError('You already have an appointment during this time.', 409, 'OVERLAP');
       }
 
       // Create the appointment
@@ -116,34 +116,58 @@ const bookAppointment = async (req, res, next) => {
 };
 
 /**
- * Get the logged-in mother's appointments.
- * GET /api/appointments
+ * Get the logged-in mother's appointments (or staff query).
+ * GET /api/appointments?view=upcoming|past
  */
 const getMyAppointments = async (req, res, next) => {
   try {
     const userId = req.user.id;
-    const { status, upcoming } = req.query;
+    const { status, upcoming, view } = req.query;
 
     let query = db('appointments')
       .join('schedule_slots', 'appointments.slot_id', 'schedule_slots.id')
       .join('clinics', 'appointments.clinic_id', 'clinics.id')
-      .leftJoin('staff', 'appointments.staff_id', 'staff.id')
-      .where('appointments.mother_id', userId)
-      .select(
-        'appointments.*',
-        'schedule_slots.slot_date',
-        'schedule_slots.start_time',
-        'schedule_slots.end_time',
-        'clinics.name as clinic_name',
-        'staff.name as staff_name'
-      )
-      .orderBy('schedule_slots.slot_date', 'desc')
-      .orderBy('schedule_slots.start_time', 'desc');
+      .leftJoin('staff', 'appointments.staff_id', 'staff.id');
+
+    if (req.user.role === 'mother') {
+      query = query.where('appointments.mother_id', userId);
+    } else if (req.query.mother_id) {
+      query = query.where('appointments.mother_id', req.query.mother_id);
+    }
+
+    query = query.select(
+      'appointments.*',
+      'schedule_slots.slot_date',
+      'schedule_slots.start_time',
+      'schedule_slots.end_time',
+      'clinics.name as clinic_name',
+      'staff.name as staff_name'
+    );
+
+    // Determine view: 'upcoming' (default) vs 'past'
+    const isPast = view === 'past' || upcoming === 'false';
+    const today = new Date().toISOString().split('T')[0];
+
+    if (isPast) {
+      // Past returns attended ('completed'), cancelled, and no-show appointments, or past dates
+      query = query.where(function () {
+        this.whereIn('appointments.status', ['completed', 'cancelled', 'no_show'])
+          .orWhere('schedule_slots.slot_date', '<', today);
+      });
+    } else {
+      // Default: upcoming appointments (active/booked from today forward)
+      query = query.where(function () {
+        this.whereNotIn('appointments.status', ['completed', 'cancelled', 'no_show'])
+          .andWhere('schedule_slots.slot_date', '>=', today);
+      });
+    }
 
     if (status) query = query.where('appointments.status', status);
-    if (upcoming === 'true') {
-      query = query.where('schedule_slots.slot_date', '>=', new Date().toISOString().split('T')[0]);
-    }
+
+    // Order newest first
+    query = query
+      .orderBy('schedule_slots.slot_date', 'desc')
+      .orderBy('schedule_slots.start_time', 'desc');
 
     const appointments = await query;
 
@@ -182,11 +206,11 @@ const getAppointment = async (req, res, next) => {
       )
       .first();
 
-    if (!appointment) throw new AppError('Appointment not found.', 404);
+    if (!appointment) throw new AppError('Appointment not found.', 404, 'NOT_FOUND');
 
     // Check access: mother can only see her own, staff can see all
     if (req.user.role === 'mother' && appointment.mother_id !== req.user.id) {
-      throw new AppError('Access denied.', 403);
+      throw new AppError('Access denied.', 403, 'FORBIDDEN');
     }
 
     appointment.babies = await db('appointment_babies')
@@ -209,26 +233,47 @@ const rescheduleAppointment = async (req, res, next) => {
     const { new_slot_id } = req.body;
 
     const appointment = await db('appointments').where('id', req.params.id).first();
-    if (!appointment) throw new AppError('Appointment not found.', 404);
-    if (appointment.status !== 'booked') throw new AppError('Only booked appointments can be rescheduled.', 400);
+    if (!appointment) throw new AppError('Appointment not found.', 404, 'NOT_FOUND');
+    if (req.user.role === 'mother' && appointment.mother_id !== req.user.id) {
+      throw new AppError('Access denied.', 403, 'FORBIDDEN');
+    }
+    if (appointment.status !== 'booked') throw new AppError('Only booked appointments can be rescheduled.', 400, 'BAD_REQUEST');
 
     // Check cutoff
     const slot = await db('schedule_slots').where('id', appointment.slot_id).first();
     const appointmentDateTime = new Date(`${slot.slot_date}T${slot.start_time}`);
     if (!isWithinCutoff(appointmentDateTime, config.cancelCutoffHours)) {
-      throw new AppError(`Cannot reschedule within ${config.cancelCutoffHours} hours of the appointment.`, 400);
+      throw new AppError(`Cannot reschedule within ${config.cancelCutoffHours} hours of the appointment.`, 400, 'CUTOFF_PASSED');
     }
 
     // Book the new slot (with locking)
     await db.transaction(async (trx) => {
       const newSlot = await trx('schedule_slots').where('id', new_slot_id).forUpdate().first();
-      if (!newSlot) throw new AppError('New slot not found.', 404);
+      if (!newSlot) throw new AppError('New slot not found.', 404, 'NOT_FOUND');
+      if (newSlot.is_blocked) throw new AppError('This slot is blocked.', 400, 'BAD_REQUEST');
 
       const taken = await trx('appointments')
         .where('slot_id', new_slot_id)
         .whereIn('status', ['booked', 'checked_in'])
         .first();
-      if (taken) throw new AppError('New slot is already booked.', 409);
+      if (taken) throw new AppError('New slot is already booked.', 409, 'SLOT_TAKEN');
+
+      // Check overlapping appointment on the new slot date/time
+      const overlapping = await trx('appointments')
+        .join('schedule_slots', 'appointments.slot_id', 'schedule_slots.id')
+        .where('appointments.mother_id', appointment.mother_id)
+        .where('appointments.id', '!=', req.params.id)
+        .where('schedule_slots.slot_date', newSlot.slot_date)
+        .whereIn('appointments.status', ['booked', 'checked_in'])
+        .where(function () {
+          this.where('schedule_slots.start_time', '<', newSlot.end_time)
+            .andWhere('schedule_slots.end_time', '>', newSlot.start_time);
+        })
+        .first();
+
+      if (overlapping) {
+        throw new AppError('You already have an appointment during this time.', 409, 'OVERLAP');
+      }
 
       await trx('appointments')
         .where('id', req.params.id)
@@ -268,13 +313,16 @@ const rescheduleAppointment = async (req, res, next) => {
 const cancelAppointment = async (req, res, next) => {
   try {
     const appointment = await db('appointments').where('id', req.params.id).first();
-    if (!appointment) throw new AppError('Appointment not found.', 404);
-    if (appointment.status !== 'booked') throw new AppError('Only booked appointments can be cancelled.', 400);
+    if (!appointment) throw new AppError('Appointment not found.', 404, 'NOT_FOUND');
+    if (req.user.role === 'mother' && appointment.mother_id !== req.user.id) {
+      throw new AppError('Access denied.', 403, 'FORBIDDEN');
+    }
+    if (appointment.status !== 'booked') throw new AppError('Only booked appointments can be cancelled.', 400, 'BAD_REQUEST');
 
     const slot = await db('schedule_slots').where('id', appointment.slot_id).first();
     const appointmentDateTime = new Date(`${slot.slot_date}T${slot.start_time}`);
     if (!isWithinCutoff(appointmentDateTime, config.cancelCutoffHours)) {
-      throw new AppError(`Cannot cancel within ${config.cancelCutoffHours} hours of the appointment.`, 400);
+      throw new AppError(`Cannot cancel within ${config.cancelCutoffHours} hours of the appointment.`, 400, 'CUTOFF_PASSED');
     }
 
     await db('appointments')

@@ -12,6 +12,10 @@ const authenticate = (req, res, next) => {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
         success: false,
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Access denied. No token provided.',
+        },
         message: 'Access denied. No token provided.',
       });
     }
@@ -25,11 +29,19 @@ const authenticate = (req, res, next) => {
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({
         success: false,
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Token has expired. Please log in again.',
+        },
         message: 'Token has expired. Please log in again.',
       });
     }
     return res.status(401).json({
       success: false,
+      error: {
+        code: 'UNAUTHORIZED',
+        message: 'Invalid token.',
+      },
       message: 'Invalid token.',
     });
   }
@@ -44,6 +56,10 @@ const authorize = (...roles) => {
     if (!req.user) {
       return res.status(401).json({
         success: false,
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Authentication required.',
+        },
         message: 'Authentication required.',
       });
     }
@@ -51,6 +67,10 @@ const authorize = (...roles) => {
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
+        error: {
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to perform this action.',
+        },
         message: 'You do not have permission to perform this action.',
       });
     }

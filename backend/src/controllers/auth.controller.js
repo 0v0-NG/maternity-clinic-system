@@ -12,13 +12,18 @@ const { AppError } = require('../middleware/errorHandler');
  */
 const register = async (req, res, next) => {
   try {
-    const { phone, name, password } = req.body;
+    const { phone, name, password, consent } = req.body;
+
+    if (consent !== true && consent !== 'true') {
+      throw new AppError('Consent under the Nigeria Data Protection Act 2023 is required.', 400, 'CONSENT_REQUIRED');
+    }
+
     const formattedPhone = formatPhone(phone);
 
     // Check if phone already exists
     const existing = await db('mothers').where('phone', formattedPhone).first();
     if (existing) {
-      throw new AppError('An account with this phone number already exists.', 409);
+      throw new AppError('An account with this phone number already exists.', 409, 'CONFLICT');
     }
 
     // Hash password
@@ -34,6 +39,7 @@ const register = async (req, res, next) => {
       password_hash: passwordHash,
       is_verified: false,
       role: 'mother',
+      consent_at: new Date(),
       created_at: new Date(),
     });
 
@@ -86,7 +92,7 @@ const verifyOTP = async (req, res, next) => {
         data: { token },
       });
     } else {
-      throw new AppError('Invalid or expired OTP. Please try again.', 400);
+      throw new AppError('Invalid or expired OTP. Please try again.', 400, 'OTP_INVALID');
     }
   } catch (error) {
     next(error);
@@ -112,18 +118,18 @@ const login = async (req, res, next) => {
     }
 
     if (!user) {
-      throw new AppError('Invalid phone number or password.', 401);
+      throw new AppError('Invalid phone number or password.', 401, 'UNAUTHORIZED');
     }
 
     // Check password
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
-      throw new AppError('Invalid phone number or password.', 401);
+      throw new AppError('Invalid phone number or password.', 401, 'UNAUTHORIZED');
     }
 
     // Check if mother account is verified
     if (role === 'mother' && !user.is_verified) {
-      throw new AppError('Please verify your phone number before logging in.', 403);
+      throw new AppError('Please verify your phone number before logging in.', 403, 'FORBIDDEN');
     }
 
     const token = generateToken({ ...user, role });
