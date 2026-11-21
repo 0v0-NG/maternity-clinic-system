@@ -225,6 +225,7 @@ const getMyAppointments = async (req, res, next) => {
 
     // Get linked babies for each appointment
     for (const appt of appointments) {
+      appt.late_arrival = Boolean(appt.late_arrival);
       appt.babies = await db('appointment_babies')
         .join('babies', 'appointment_babies.baby_id', 'babies.id')
         .where('appointment_babies.appointment_id', appt.id)
@@ -264,6 +265,8 @@ const getAppointment = async (req, res, next) => {
     if (req.user.role === 'mother' && appointment.mother_id !== req.user.id) {
       throw new AppError('Access denied.', 403, 'FORBIDDEN');
     }
+
+    appointment.late_arrival = Boolean(appointment.late_arrival);
 
     appointment.babies = await db('appointment_babies')
       .join('babies', 'appointment_babies.baby_id', 'babies.id')
@@ -459,20 +462,39 @@ const checkIn = async (req, res, next) => {
   try {
     const appointment = await db('appointments')
       .join('clinics', 'appointments.clinic_id', 'clinics.id')
+      .join('schedule_slots', 'appointments.slot_id', 'schedule_slots.id')
       .where('appointments.id', req.params.id)
-      .select('appointments.*', 'clinics.name as clinic_name')
+      .select(
+        'appointments.*',
+        'clinics.name as clinic_name',
+        'schedule_slots.slot_date',
+        'schedule_slots.start_time',
+        'schedule_slots.end_time'
+      )
       .first();
 
-    if (!appointment) throw new AppError('Appointment not found.', 404);
-    if (appointment.status !== 'booked') throw new AppError('Only booked appointments can be checked in.', 400);
+    if (!appointment) throw new AppError('Appointment not found.', 404, 'NOT_FOUND');
+
+    // On a different date, or if the appointment is cancelled or already checked in: refuse (CHECKIN_NOT_ALLOWED)
+    const today = getLagosToday();
+    if (appointment.status !== 'booked' || appointment.slot_date !== today) {
+      throw new AppError('Check-in is not allowed for this appointment.', 400, 'CHECKIN_NOT_ALLOWED');
+    }
+
+    // Determine late arrival: up to start_time + grace is normal, after that is flagged late_arrival = true
+    const slotStart = parseLagosDateTime(appointment.slot_date, appointment.start_time);
+    const graceMs = config.lateGraceMinutes * 60 * 1000;
+    const graceCutoff = slotStart.getTime() + graceMs;
+    const now = new Date();
+    const isLate = now.getTime() > graceCutoff;
 
     // Count today's check-ins for this clinic to generate queue number
-    const today = getLagosToday();
+    // Counts all checked-in appointments today (whereNotNull checked_in_at) so late arrivals always go to the end
     const checkedInCount = await db('appointments')
       .join('schedule_slots', 'appointments.slot_id', 'schedule_slots.id')
       .where('appointments.clinic_id', appointment.clinic_id)
       .where('schedule_slots.slot_date', today)
-      .where('appointments.status', 'checked_in')
+      .whereNotNull('appointments.checked_in_at')
       .count('* as count')
       .first();
 
@@ -484,23 +506,34 @@ const checkIn = async (req, res, next) => {
       .update({
         status: 'checked_in',
         queue_number: queueNumber,
-        checked_in_at: new Date(),
-        updated_at: new Date(),
+        late_arrival: isLate,
+        checked_in_at: now.toISOString(),
+        updated_at: now.toISOString(),
       });
 
-    // Audit log
+    // Audit log with late_arrival flag
     await db('audit_logs').insert({
       id: generateId(),
       user_id: req.user.id,
       action: 'CHECKIN_PATIENT',
-      details: JSON.stringify({ appointmentId: req.params.id, queueNumber }),
-      created_at: new Date(),
+      details: JSON.stringify({
+        appointmentId: req.params.id,
+        queueNumber,
+        late_arrival: isLate,
+      }),
+      created_at: now,
     });
 
     res.json({
       success: true,
       message: 'Patient checked in.',
-      data: { queueNumber },
+      data: {
+        appointmentId: req.params.id,
+        queueNumber,
+        status: 'checked_in',
+        checked_in_at: now,
+        late_arrival: isLate,
+      },
     });
   } catch (error) {
     next(error);
@@ -517,11 +550,33 @@ const updateStatus = async (req, res, next) => {
     const allowedStatuses = ['waiting', 'in_consultation', 'completed', 'no_show'];
 
     if (!allowedStatuses.includes(status)) {
-      throw new AppError(`Status must be one of: ${allowedStatuses.join(', ')}`, 400);
+      throw new AppError(`Status must be one of: ${allowedStatuses.join(', ')}`, 400, 'BAD_REQUEST');
     }
 
-    const appointment = await db('appointments').where('id', req.params.id).first();
-    if (!appointment) throw new AppError('Appointment not found.', 404);
+    const appointment = await db('appointments')
+      .join('schedule_slots', 'appointments.slot_id', 'schedule_slots.id')
+      .where('appointments.id', req.params.id)
+      .select('appointments.*', 'schedule_slots.slot_date', 'schedule_slots.start_time')
+      .first();
+
+    if (!appointment) throw new AppError('Appointment not found.', 404, 'NOT_FOUND');
+
+    if (status === 'no_show') {
+      // Allowed only for appointments never checked in (status must be 'booked')
+      if (appointment.status !== 'booked') {
+        throw new AppError('Only appointments that were never checked in can be marked as no-show.', 400, 'BAD_REQUEST');
+      }
+
+      // Allowed only after start_time + grace in Africa/Lagos
+      const slotStart = parseLagosDateTime(appointment.slot_date, appointment.start_time);
+      const graceMs = config.lateGraceMinutes * 60 * 1000;
+      const graceCutoff = slotStart.getTime() + graceMs;
+      const now = new Date();
+
+      if (now.getTime() <= graceCutoff) {
+        throw new AppError('Cannot mark appointment as no-show before the grace period has expired.', 400, 'NO_SHOW_TOO_EARLY');
+      }
+    }
 
     await db('appointments')
       .where('id', req.params.id)

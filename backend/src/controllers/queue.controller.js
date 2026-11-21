@@ -22,6 +22,7 @@ const getTodayQueue = async (req, res, next) => {
         'appointments.status',
         'appointments.booking_type',
         'appointments.checked_in_at',
+        'appointments.late_arrival',
         'mothers.name as mother_name',
         'schedule_slots.start_time'
       )
@@ -29,11 +30,15 @@ const getTodayQueue = async (req, res, next) => {
 
     const isStaff = req.user && ['front_desk', 'midwife', 'doctor', 'admin'].includes(req.user.role);
     const sanitizedQueue = isStaff
-      ? queue
+      ? queue.map((q) => ({
+          ...q,
+          late_arrival: Boolean(q.late_arrival),
+        }))
       : queue.map((q) => ({
           queue_number: q.queue_number,
           status: q.status,
           checked_in_at: q.checked_in_at,
+          late_arrival: Boolean(q.late_arrival),
         }));
 
     res.json({
@@ -75,6 +80,7 @@ const getQueuePosition = async (req, res, next) => {
           status: appointment.status,
           queueNumber: appointment.queue_number,
           position: null,
+          late_arrival: Boolean(appointment.late_arrival),
           message: appointment.status === 'in_consultation'
             ? 'You are currently being seen.'
             : `Appointment status: ${appointment.status}`,
@@ -99,6 +105,7 @@ const getQueuePosition = async (req, res, next) => {
         queueNumber: appointment.queue_number,
         position: parseInt(ahead.count) + 1,
         status: appointment.status,
+        late_arrival: Boolean(appointment.late_arrival),
         message: `You are number ${parseInt(ahead.count) + 1} in the queue.`,
       },
     });

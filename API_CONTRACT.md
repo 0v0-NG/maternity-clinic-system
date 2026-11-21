@@ -329,12 +329,14 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
   - `clinic_id` (string, optional): Filter by clinic
 - **Behavior**:
   - Mothers see only their own appointments.
+  - Returns appointment objects including `late_arrival` (boolean, default `false`).
   - `?view=past` returns `completed`, `cancelled`, and `no_show` appointments, ordered newest first.
   - Appointments are **never deleted**; there is no delete endpoint.
 
 #### `GET /api/appointments/:id`
 - **Role**: `mother` (ownership enforced), `front_desk`, `midwife`, `doctor`, `admin`
 - **Access Rule**: Mothers receive `403 FORBIDDEN` if attempting to view an appointment belonging to another mother.
+- **Payload**: Includes full appointment details and `late_arrival: boolean`.
 
 #### `PUT /api/appointments/:id/reschedule`
 - **Role**: `mother` (ownership enforced), `front_desk`, `admin`
@@ -370,7 +372,13 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
 
 #### `POST /api/appointments/:id/checkin`
 - **Role**: `front_desk`, `admin`
-- **Behavior**: Marks patient as `checked_in`, records `checked_in_at` timestamp, and assigns a sequential daily queue ticket (e.g. `ANC-001`, `PNC-001`).
+- **Behavior & Grace Period Rules**:
+  - Allowed on the appointment's scheduled date only (`Africa/Lagos` time) when status is `booked`.
+  - Check-in on a different date, or when the appointment is cancelled or already checked in, is refused with `400 CHECKIN_NOT_ALLOWED`.
+  - **Grace Period (`LATE_GRACE_MINUTES`, default 15)**:
+    - Up to `start_time + grace`: Normal check-in with `late_arrival: false`.
+    - After `start_time + grace`: Still accepted, but flagged with `late_arrival: true`.
+    - Late mothers join the END of the queue based on their check-in time (`checked_in_at`), never displacing mothers who checked in earlier.
 - **Success Response (200 OK)**:
 ```json
 {
@@ -380,15 +388,20 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
     "appointmentId": "e8df483f-67d7-4be7-b35f-eb59d9f5aa1a",
     "queueNumber": "ANC-001",
     "status": "checked_in",
-    "checked_in_at": "2026-11-21T10:45:00.000Z"
+    "checked_in_at": "2026-11-21T10:45:00.000Z",
+    "late_arrival": false
   }
 }
 ```
+- **Error Codes**: `CHECKIN_NOT_ALLOWED` (400), `NOT_FOUND` (404), `FORBIDDEN` (403), `UNAUTHORIZED` (401).
 
 #### `PUT /api/appointments/:id/status`
 - **Role**: `midwife`, `doctor`, `admin`
 - **Body**:
   - `status` (string, required): One of `"waiting"`, `"in_consultation"`, `"completed"`, `"no_show"`
+- **Rules**:
+  - **Marking `no_show`**: Allowed only for appointments never checked in (status must be `booked`), and only after `start_time + LATE_GRACE_MINUTES` has passed in `Africa/Lagos` time. Before that, refused with `400 NO_SHOW_TOO_EARLY`.
+  - Appointments already checked in cannot be marked as `no_show` (`400 BAD_REQUEST`).
 - **Success Response (200 OK)**:
 ```json
 {
@@ -396,6 +409,7 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
   "message": "Appointment status updated to completed."
 }
 ```
+- **Error Codes**: `NO_SHOW_TOO_EARLY` (400), `BAD_REQUEST` (400), `NOT_FOUND` (404), `FORBIDDEN` (403), `UNAUTHORIZED` (401).
 
 ---
 
@@ -404,8 +418,8 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
 #### `GET /api/queue/today/:clinicId`
 - **Role**: Any Authenticated User
 - **Privacy Rule**:
-  - **Mothers**: Patient names (`mother_name`) are stripped. Returns only ticket number, status, timestamp, and the ticket currently being served.
-  - **Staff**: Full queue details including patient names and appointment details.
+  - **Mothers**: Patient names (`mother_name`) are stripped. Returns ticket number, status, timestamp, `late_arrival` flag, and the ticket currently being served.
+  - **Staff**: Full queue details including patient names, appointment details, and `late_arrival` flag.
 - **Success Response for Mothers (200 OK)**:
 ```json
 {
@@ -417,7 +431,8 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
       {
         "queue_number": "ANC-001",
         "status": "checked_in",
-        "checked_in_at": "2026-11-21T10:30:00.000Z"
+        "checked_in_at": "2026-11-21T10:30:00.000Z",
+        "late_arrival": false
       }
     ],
     "totalInQueue": 1,
@@ -433,11 +448,11 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
 {
   "success": true,
   "data": {
-    "appointmentId": "e8df483f-67d7-4be7-b35f-eb59d9f5aa1a",
     "queueNumber": "ANC-001",
     "position": 1,
     "status": "checked_in",
-    "estimatedWaitMin": 0
+    "late_arrival": false,
+    "message": "You are number 1 in the queue."
   }
 }
 ```
@@ -519,6 +534,8 @@ For validation failures (`422 Unprocessable Entity`), an additional `errors` arr
 | `SLOT_RESERVED` | 400 | A mother attempted to book or reschedule into a walk-in reserved slot (`is_walkin: true`). |
 | `SLOT_PAST` | 400 | The slot's start time (for mothers) or end time (for staff) has already passed in Nigerian wall-clock time (`Africa/Lagos`). |
 | `CUTOFF_PASSED` | 400 | An attempt was made to cancel or reschedule an appointment less than 4 hours before its scheduled start time. |
+| `CHECKIN_NOT_ALLOWED` | 400 | Check-in attempted on a date other than the appointment's scheduled date, or appointment is cancelled/already checked in. |
+| `NO_SHOW_TOO_EARLY` | 400 | Attempted to mark an appointment as `no_show` before `start_time + LATE_GRACE_MINUTES` has expired. |
 | `OTP_INVALID` | 400 | The submitted OTP code is incorrect or has expired. |
 | `BAD_REQUEST` | 400 | Generic operational bad request (e.g. attempting to check in an appointment that is not in `"booked"` status). |
 | `INTERNAL_SERVER_ERROR` | 500 | Unhandled server error. |
@@ -575,6 +592,12 @@ Queue tickets track the clinical waiting area sequence for checked-in appointmen
    - A mother cannot hold two active appointments that overlap in time on the same date, even across different clinics. The mother's record is locked (`forUpdate()`) during booking and rescheduling to serialize concurrent submissions.
 6. **4-Hour Reschedule & Cancellation Cutoff**:
    - Patients and staff cannot cancel or reschedule appointments within 4 hours of the slot start time (`CUTOFF_PASSED`).
+7. **Late-Arrival Grace Period (`LATE_GRACE_MINUTES`, default 15)**:
+   - Check-in is permitted on the appointment's scheduled date only (`Africa/Lagos` time) when status is `booked`. Attempting check-in on any other date or on cancelled/checked-in appointments is refused with `CHECKIN_NOT_ALLOWED`.
+   - Up to `start_time + grace_minutes`: normal check-in (`late_arrival: false`).
+   - After `start_time + grace_minutes`: check-in is still accepted, but flagged with `late_arrival: true`.
+   - Late arrivals join the END of the queue based on their check-in time (`checked_in_at`), never displacing mothers who checked in earlier.
+   - Marking `no_show` is permitted only for appointments never checked in (status `booked`), and only after `start_time + grace_minutes`. Attempts prior to grace expiry are refused with `NO_SHOW_TOO_EARLY`.
 
 ---
 
@@ -613,11 +636,16 @@ The backend is intentionally stateless and headless. The frontend application MU
      - `SLOT_RESERVED`: *"This slot is reserved for hospital walk-in patients."*
      - `SLOT_PAST`: *"This time slot has already passed."*
      - `CUTOFF_PASSED`: *"Appointments cannot be rescheduled or cancelled within 4 hours of start time. Please contact the front desk."*
+     - `CHECKIN_NOT_ALLOWED`: *"Check-in is only allowed on the scheduled appointment date for active bookings."*
+     - `NO_SHOW_TOO_EARLY`: *"Cannot mark as no-show until the late-arrival grace period (15 minutes) has passed."*
      - `FORBIDDEN`: *"You do not have permission to view or modify this record."*
 3. **Queue Polling & Auto-Refresh**:
    - Live waiting room displays and mother queue status screens should poll `GET /api/queue/today/:clinicId` and `GET /api/queue/position/:appointmentId` (recommended interval: 15–30 seconds) or provide a manual "Refresh Queue" control.
-4. **Token Persistence & Auto-Refresh**:
+4. **Late Badge Indicator**:
+   - The frontend must inspect `late_arrival` (boolean) on appointments and queue items.
+   - Display a prominent **"Late" badge** next to appointments and waiting room entries where `late_arrival: true` so clinic staff and patients clearly see the patient arrived after their scheduled window.
+5. **Token Persistence & Auto-Refresh**:
    - Store the access token in secure client storage (or memory) and the refresh token in an HTTP-only cookie or secure storage.
    - Intercept `401 UNAUTHORIZED` responses, invoke `POST /api/auth/refresh-token`, and replay the failed request.
-5. **Timezone Awareness**:
+6. **Timezone Awareness**:
    - The backend runs on Nigeria Standard Time (`Africa/Lagos` UTC+1). The frontend should format dates and countdowns matching Nigerian time regardless of the user's browser device timezone.

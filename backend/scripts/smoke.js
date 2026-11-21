@@ -15,6 +15,9 @@
 
 const http = require('http');
 const https = require('https');
+const { v4: uuidv4 } = require('uuid');
+const db = require('../src/config/database');
+const { getLagosToday } = require('../src/utils/helpers');
 
 const BASE_URL = process.env.API_URL || 'http://localhost:5000/api';
 
@@ -72,6 +75,13 @@ async function runSmokeTest() {
   let passedCount = 0;
   let totalSteps = 12;
 
+  let motherId = null;
+  let babyId = null;
+  let appointmentId = null;
+  let m2Id = null;
+  let tempSlotId = null;
+  let tempWalkinSlotId = null;
+
   try {
     // 1. Register Mother
     const testPhone = `080${Math.floor(10000000 + Math.random() * 90000000)}`;
@@ -89,7 +99,8 @@ async function runSmokeTest() {
       console.log(`[FAIL] Step 1: Register Mother - Status ${regRes.status}: ${JSON.stringify(regRes.data)}`);
       process.exit(1);
     }
-    const { motherId, pinId, demoOtp } = regRes.data.data;
+    const { motherId: regMotherId, pinId, demoOtp } = regRes.data.data;
+    motherId = regMotherId;
     console.log('[PASS] Step 1: Register Mother');
     passedCount++;
 
@@ -126,47 +137,55 @@ async function runSmokeTest() {
       console.log(`[FAIL] Step 3: Add Baby - Status ${babyRes.status}: ${JSON.stringify(babyRes.data)}`);
       process.exit(1);
     }
-    const babyId = babyRes.data.data.id;
+    babyId = babyRes.data.data.id;
     console.log('[PASS] Step 3: Add Baby');
     passedCount++;
 
-    // 4. List Clinics & Slots
+    // 4. List Clinics & Ensure Slots on Today (Africa/Lagos)
     const clinicsRes = await request('/clinics');
     if (clinicsRes.status !== 200 || !clinicsRes.data?.data?.length) {
       console.log(`[FAIL] Step 4: List Clinics - Status ${clinicsRes.status}`);
       process.exit(1);
     }
-    // Find a clinic and date with available non-walkin slots
-    let clinic = null;
-    let selectedSlot = null;
-    const now = new Date();
-    const sortedClinics = [...clinicsRes.data.data].sort((a, b) => (b.name === 'Antenatal Clinic' ? 1 : -1));
+    const clinic = clinicsRes.data.data.find((c) => c.name === 'Antenatal Clinic') || clinicsRes.data.data[0];
+    const today = getLagosToday();
 
-    for (const candClinic of sortedClinics) {
-      for (let d = 0; d < 7; d++) {
-        const dt = new Date(now);
-        dt.setDate(now.getDate() + d);
-        const dateStr = dt.toISOString().split('T')[0];
+    // Check if an available non-walkin slot exists today in the future
+    let slotsRes = await request(`/clinics/${clinic.id}/slots?date=${today}`);
+    let availableList = slotsRes.data?.data?.availableSlots || [];
+    let selectedSlot = availableList.find((s) => !s.is_walkin);
 
-        const slotsRes = await request(`/clinics/${candClinic.id}/slots?date=${dateStr}`);
-        const availableList = slotsRes.data?.data?.availableSlots || [];
-        if (slotsRes.status === 200 && availableList.length) {
-          const available = availableList.find((s) => !s.is_walkin);
-          if (available) {
-            selectedSlot = { ...available, slot_date: dateStr };
-            clinic = candClinic;
-            break;
-          }
-        }
-      }
-      if (selectedSlot) break;
+    // If today doesn't have an available regular slot, create a temporary one for today's test
+    if (!selectedSlot) {
+      tempSlotId = uuidv4();
+      await db('schedule_slots').insert({
+        id: tempSlotId,
+        clinic_id: clinic.id,
+        slot_date: today,
+        start_time: '23:30:00',
+        end_time: '23:50:00',
+        is_walkin: false,
+        is_blocked: false,
+      });
+      selectedSlot = { id: tempSlotId, slot_date: today, start_time: '23:30:00' };
     }
 
-    if (!selectedSlot || !clinic) {
-      console.log('[FAIL] Step 4: List Slots - No unbooked slots found in the next 7 days.');
-      process.exit(1);
+    // Ensure a walkin slot also exists today for the Step 6 filtering check
+    const hasWalkin = availableList.some((s) => s.is_walkin);
+    if (!hasWalkin) {
+      tempWalkinSlotId = uuidv4();
+      await db('schedule_slots').insert({
+        id: tempWalkinSlotId,
+        clinic_id: clinic.id,
+        slot_date: today,
+        start_time: '23:50:00',
+        end_time: '23:59:00',
+        is_walkin: true,
+        is_blocked: false,
+      });
     }
-    console.log(`[PASS] Step 4: List Slots (Found slot on ${selectedSlot.slot_date} at ${selectedSlot.start_time} in ${clinic.name})`);
+
+    console.log(`[PASS] Step 4: List Slots (Found slot on ${today} at ${selectedSlot.start_time} in ${clinic.name})`);
     passedCount++;
 
     // 5. Book Appointment
@@ -185,7 +204,7 @@ async function runSmokeTest() {
       console.log(`[FAIL] Step 5: Book Appointment - Status ${bookRes.status}: ${JSON.stringify(bookRes.data)}`);
       process.exit(1);
     }
-    const appointmentId = bookRes.data.data.id;
+    appointmentId = bookRes.data.data.id;
     console.log('[PASS] Step 5: Book Appointment');
     passedCount++;
 
@@ -205,13 +224,13 @@ async function runSmokeTest() {
     const adminToken = adminLoginRes.data.data.token;
 
     // 6. Walk-in Slots Filtering Check
-    const motherSlotsRes = await request(`/clinics/${clinic.id}/slots?date=${selectedSlot.slot_date}`, {
+    const motherSlotsRes = await request(`/clinics/${clinic.id}/slots?date=${today}`, {
       headers: { Authorization: `Bearer ${motherToken}` },
     });
     const motherSlots = motherSlotsRes.data?.data?.availableSlots || [];
     const motherHasWalkin = motherSlots.some((s) => s.is_walkin);
 
-    const staffSlotsRes = await request(`/clinics/${clinic.id}/slots?date=${selectedSlot.slot_date}`, {
+    const staffSlotsRes = await request(`/clinics/${clinic.id}/slots?date=${today}`, {
       headers: { Authorization: `Bearer ${adminToken}` },
     });
     const staffSlots = staffSlotsRes.data?.data?.availableSlots || [];
@@ -230,7 +249,8 @@ async function runSmokeTest() {
       method: 'POST',
       body: { phone: testPhone2, name: 'Smoke Mother Two', password: 'Password123!', consent: true },
     });
-    const { motherId: m2Id, pinId: p2Id, demoOtp: otp2 } = reg2Res.data.data;
+    const { motherId: registeredM2Id, pinId: p2Id, demoOtp: otp2 } = reg2Res.data.data;
+    m2Id = registeredM2Id;
     const verify2Res = await request('/auth/verify-otp', {
       method: 'POST',
       body: { motherId: m2Id, pinId: p2Id, otp: otp2 || '123456' },
@@ -317,13 +337,37 @@ async function runSmokeTest() {
     console.log(`\n========================================`);
     console.log(`SMOKE TEST RESULT: ${passedCount}/${totalSteps} PASSED`);
     console.log(`========================================\n`);
-    process.exit(0);
   } catch (error) {
     console.error(`\nSmoke test encountered an error:`, error.message);
     if (error.code === 'ECONNREFUSED') {
       console.error(`Backend is not running at ${BASE_URL}. Start it with 'npm start' before running smoke tests.`);
     }
-    process.exit(1);
+    process.exitCode = 1;
+  } finally {
+    try {
+      if (appointmentId) {
+        await db('appointment_babies').where('appointment_id', appointmentId).del();
+        await db('appointments').where('id', appointmentId).del();
+      }
+      if (babyId) {
+        await db('babies').where('id', babyId).del();
+      }
+      if (tempSlotId) {
+        await db('schedule_slots').where('id', tempSlotId).del();
+      }
+      if (tempWalkinSlotId) {
+        await db('schedule_slots').where('id', tempWalkinSlotId).del();
+      }
+      if (motherId) {
+        await db('mothers').where('id', motherId).del();
+      }
+      if (m2Id) {
+        await db('mothers').where('id', m2Id).del();
+      }
+      await db.destroy();
+    } catch (cleanErr) {
+      // ignore
+    }
   }
 }
 
