@@ -16,6 +16,20 @@ router.post(
     body('consent')
       .custom((val) => val === true || val === 'true')
       .withMessage('Consent under the Nigeria Data Protection Act 2023 is required.'),
+    body('hospital_id')
+      .optional()
+      .isString()
+      .withMessage('Hospital ID must be a string.')
+      .trim()
+      .isLength({ max: 50 })
+      .withMessage('Hospital ID must not exceed 50 characters.'),
+    body('hmo_number')
+      .optional()
+      .isString()
+      .withMessage('HMO / NHIA number must be a string.')
+      .trim()
+      .isLength({ max: 50 })
+      .withMessage('HMO / NHIA number must not exceed 50 characters.'),
   ]),
   authController.register
 );

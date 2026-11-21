@@ -12,7 +12,7 @@ const { AppError } = require('../middleware/errorHandler');
  */
 const register = async (req, res, next) => {
   try {
-    const { phone, name, password, consent } = req.body;
+    const { phone, name, password, consent, hospital_id, hmo_number } = req.body;
 
     if (consent !== true && consent !== 'true') {
       throw new AppError('Consent under the Nigeria Data Protection Act 2023 is required.', 400, 'CONSENT_REQUIRED');
@@ -30,6 +30,10 @@ const register = async (req, res, next) => {
     const salt = await bcrypt.genSalt(12);
     const passwordHash = await bcrypt.hash(password, salt);
 
+    // Format optional hospital_id and hmo_number: trimmed strings, empty becomes null
+    const cleanHospitalId = hospital_id && typeof hospital_id === 'string' && hospital_id.trim() ? hospital_id.trim() : null;
+    const cleanHmoNumber = hmo_number && typeof hmo_number === 'string' && hmo_number.trim() ? hmo_number.trim() : null;
+
     // Create mother record
     const id = generateId();
     await db('mothers').insert({
@@ -37,6 +41,8 @@ const register = async (req, res, next) => {
       phone: formattedPhone,
       name,
       password_hash: passwordHash,
+      hospital_id: cleanHospitalId,
+      hmo_number: cleanHmoNumber,
       is_verified: false,
       role: 'mother',
       consent_at: new Date(),
@@ -82,14 +88,26 @@ const verifyOTP = async (req, res, next) => {
     if (result.verified === true || result.verified === 'True') {
       await db('mothers').where('id', motherId).update({ is_verified: true });
 
-      // Generate token
+      // Generate access & refresh tokens matching login
       const mother = await db('mothers').where('id', motherId).first();
-      const token = generateToken(mother);
+      const role = 'mother';
+      const token = generateToken({ ...mother, role });
+      const refreshToken = generateRefreshToken({ ...mother, role });
 
       res.json({
         success: true,
         message: 'Phone number verified successfully.',
-        data: { token },
+        data: {
+          token,
+          refreshToken,
+          user: {
+            id: mother.id,
+            name: mother.name,
+            phone: mother.phone,
+            role,
+            is_verified: true,
+          },
+        },
       });
     } else {
       throw new AppError('Invalid or expired OTP. Please try again.', 400, 'OTP_INVALID');

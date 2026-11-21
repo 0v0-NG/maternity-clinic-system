@@ -49,7 +49,7 @@ const updateProfile = async (req, res, next) => {
 
     const mother = await db('mothers')
       .where('id', req.user.id)
-      .select('id', 'name', 'phone', 'hospital_id', 'hmo_number')
+      .select('id', 'name', 'phone', 'hospital_id', 'hmo_number', 'created_at')
       .first();
 
     res.json({

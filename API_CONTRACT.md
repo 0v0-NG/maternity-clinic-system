@@ -169,8 +169,8 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
   - `name` (string, required): Full name
   - `password` (string, required): Minimum 6 characters
   - `consent` (boolean, required): Must be strictly `true` (NDPA 2023 requirement)
-  - `hospital_id` (string, optional): Hospital folder/ID number
-  - `hmo_number` (string, optional): HMO / NHIA enrollment number
+  - `hospital_id` (string, optional): Hospital folder/ID number (max 50 characters, trimmed; empty becomes `null`)
+  - `hmo_number` (string, optional): HMO / NHIA enrollment number (max 50 characters, trimmed; empty becomes `null`)
 - **Success Response (201 Created)**:
 ```json
 {
@@ -183,7 +183,7 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
   }
 }
 ```
-- **Note on Optional Fields**: While `hospital_id` and `hmo_number` are accepted in the request body, the backend registration handler currently does not persist them to the database on registration. Mothers can persist these fields after verification via `PUT /api/mothers/profile`.
+- **Note on Optional Fields**: Optional `hospital_id` and `hmo_number` are validated (string, max 50 characters, trimmed; empty string becomes `null`) and persisted directly to the new mother record in the database upon registration. They can also be updated after verification via `PUT /api/mothers/profile`.
 - **Error Codes**: `VALIDATION_ERROR` (422), `CONFLICT` (409).
 
 #### `POST /api/auth/verify-otp`
@@ -198,12 +198,18 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
   "success": true,
   "message": "Phone number verified successfully.",
   "data": {
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImIxYjcwMjFiLTQxN2MtNDczZC04MmQwLWEwYmM1ZTUxMDgyNSIsInJvbGUiOiJtb3RoZXIiLCJuYW1lIjoiQW1pbmEgQmVsbG8iLCJpYXQiOjE3OTUyNzk...",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "user": {
+      "id": "b1b7021b-417c-473d-82d0-a0bc5e510825",
+      "name": "Amina Bello",
+      "phone": "+2348012345678",
+      "role": "mother",
+      "is_verified": true
+    }
   }
 }
 ```
-> [!NOTE]
-> The live backend returns only `{ token }` in `data` upon OTP verification. Unlike `POST /api/auth/login`, it does **not** return `refreshToken` or a `user` object. Clients should decode the JWT payload to extract `{ id, name, role }` or fetch `GET /api/mothers/profile`. See Section 9.
 - **Error Codes**: `VALIDATION_ERROR` (422), `OTP_INVALID` (400), `NOT_FOUND` (404).
 
 #### `POST /api/auth/resend-otp`
@@ -722,7 +728,8 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
     "name": "Mrs. Amina Bello",
     "phone": "+2348012345678",
     "hospital_id": "HOSP-00123",
-    "hmo_number": "HMO-456"
+    "hmo_number": "HMO-456",
+    "created_at": "2026-11-21T08:55:56.081Z"
   }
 }
 ```
@@ -1344,36 +1351,15 @@ The backend is a stateless REST API designed to power web, mobile, and kiosk fro
 
 During the end-to-end audit against the live running Express API, the following backend implementation issues were identified where the actual backend code diverges from intended REST API design or exhibits functional bugs:
 
-### 1. `POST /api/auth/verify-otp` Omits `refreshToken` and `user` Object
-- **Location**: `backend/src/controllers/auth.controller.js` (lines 86–94)
-- **Current Behavior**: The controller calls `const token = generateToken(mother)` and returns `data: { token }`. It does not call `generateRefreshToken` and does not assemble or return the `user` object (`id`, `name`, `phone`, `role`, `is_verified`).
-- **Impact**: Clients calling `verify-otp` do not receive a persistent refresh token or user profile. The frontend is forced to decode the JWT access token in-browser to obtain `{ id, name, role }`.
-- **Recommended Backend Fix**: Align with `POST /api/auth/login`:
-  ```javascript
-  const token = generateToken(mother);
-  const refreshToken = generateRefreshToken(mother);
-  res.json({
-    success: true,
-    message: 'Phone number verified successfully.',
-    data: {
-      token,
-      refreshToken,
-      user: {
-        id: mother.id,
-        name: mother.name,
-        phone: mother.phone,
-        role: 'mother',
-        is_verified: true,
-      },
-    },
-  });
-  ```
+### 1. [FIXED] `POST /api/auth/verify-otp` Omits `refreshToken` and `user` Object
+- **Status**: **RESOLVED / FIXED**
+- **Location**: `backend/src/controllers/auth.controller.js`
+- **Resolution**: `POST /api/auth/verify-otp` now generates and returns `refreshToken` and `user: { id, name, phone, role, is_verified }`, matching the response structure of `POST /api/auth/login`.
 
-### 2. `POST /api/auth/register` Drops `hospital_id` and `hmo_number`
-- **Location**: `backend/src/controllers/auth.controller.js` (lines 13–45)
-- **Current Behavior**: The controller extracts only `{ phone, name, password, consent }` from `req.body`, omitting `hospital_id` and `hmo_number`. When inserting the new record into the `mothers` table, those columns are left unset (`NULL`).
-- **Impact**: Any `hospital_id` or `hmo_number` entered during registration is silently dropped. Mothers must re-enter them on the profile page via `PUT /api/mothers/profile`.
-- **Recommended Backend Fix**: Extract `hospital_id` and `hmo_number` from `req.body` and include them in `db('mothers').insert(...)`.
+### 2. [FIXED] `POST /api/auth/register` Drops `hospital_id` and `hmo_number`
+- **Status**: **RESOLVED / FIXED**
+- **Location**: `backend/src/controllers/auth.controller.js`, `backend/src/routes/auth.routes.js`
+- **Resolution**: `POST /api/auth/register` now validates optional `hospital_id` and `hmo_number` (strings, trimmed, maximum 50 characters; empty string converted to `null`) and persists them directly to the `mothers` table upon registration.
 
 ### 3. Missing `GET /api/auth/me` Endpoint
 - **Location**: `backend/src/routes/auth.routes.js`
@@ -1381,10 +1367,10 @@ During the end-to-end audit against the live running Express API, the following 
 - **Impact**: While mothers can inspect their own session via `GET /api/mothers/profile`, staff users (`doctor`, `midwife`, `front_desk`, `admin`) have no standard endpoint to validate their token or read their current user record.
 - **Recommended Backend Fix**: Add an authenticated `GET /api/auth/me` route that returns `{ success: true, data: { user: req.user } }`.
 
-### 4. `PUT /api/mothers/profile` Response Shape Omits `created_at`
+### 4. [FIXED] `PUT /api/mothers/profile` Response Shape Omits `created_at`
+- **Status**: **RESOLVED / FIXED**
 - **Location**: `backend/src/controllers/mother.controller.js`
-- **Current Behavior**: `GET /api/mothers/profile` returns `id`, `name`, `phone`, `hospital_id`, `hmo_number`, `created_at`, and `babies`. However, `PUT /api/mothers/profile` returns `{ id, name, phone, hospital_id, hmo_number }` without `created_at`.
-- **Impact**: Minor response asymmetry; clients updating profile data lose the `created_at` timestamp in the returned object unless refetched.
+- **Resolution**: `PUT /api/mothers/profile` now selects and returns `created_at` alongside `id`, `name`, `phone`, `hospital_id`, and `hmo_number`, maintaining consistency with `GET /api/mothers/profile`.
 
 ### 5. String Discrepancies in Success Messages
 - `POST /api/auth/register`: Returns `"Registration successful. Please verify your phone number with the OTP sent."` (Contract originally drafted: `"Registration successful. Please enter the OTP sent to your phone."`).
