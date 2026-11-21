@@ -7,6 +7,8 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "jest --coverage",
+    "db:check": "node scripts/dbCheck.js",
+    "smoke": "node scripts/smoke.js",
     "migrate": "knex migrate:latest",
     "migrate:make": "knex migrate:make",
     "migrate:rollback": "knex migrate:rollback",

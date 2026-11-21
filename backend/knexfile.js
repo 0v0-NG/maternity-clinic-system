@@ -1,6 +1,12 @@
 require('dotenv').config();
 const path = require('path');
 const config = require('./src/config');
+const pg = require('pg');
+
+// Configure node-pg type parsers so PostgreSQL output matches SQLite
+pg.types.setTypeParser(1082, (val) => val);
+pg.types.setTypeParser(20, (val) => (val === null ? null : parseInt(val, 10)));
+pg.types.setTypeParser(1700, (val) => (val === null ? null : parseFloat(val)));
 
 const usePostgres = process.env.DB_CLIENT === 'pg' || !!process.env.DATABASE_URL;
 
@@ -11,7 +17,7 @@ module.exports = {
         connection: process.env.DATABASE_URL
           ? {
               connectionString: process.env.DATABASE_URL,
-              ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+              ssl: process.env.DB_SSL === 'true' || process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
             }
           : {
               host: config.db.host,
@@ -20,7 +26,16 @@ module.exports = {
               user: config.db.user,
               password: config.db.password,
             },
-        pool: { min: 2, max: 10 },
+        pool: {
+          min: 0,
+          max: 5,
+          acquireTimeoutMillis: 30000,
+          createTimeoutMillis: 30000,
+          destroyTimeoutMillis: 5000,
+          idleTimeoutMillis: 30000,
+          reapIntervalMillis: 1000,
+        },
+        acquireConnectionTimeout: 30000,
         migrations: { directory: './migrations', tableName: 'knex_migrations' },
         seeds: { directory: './seeds' },
       }
@@ -47,7 +62,17 @@ module.exports = {
       connectionString: process.env.DATABASE_URL,
       ssl: { rejectUnauthorized: false },
     },
-    pool: { min: 2, max: 20 },
+    pool: {
+      min: 0,
+      max: 5,
+      acquireTimeoutMillis: 30000,
+      createTimeoutMillis: 30000,
+      destroyTimeoutMillis: 5000,
+      idleTimeoutMillis: 30000,
+      reapIntervalMillis: 1000,
+    },
+    acquireConnectionTimeout: 30000,
     migrations: { directory: './migrations', tableName: 'knex_migrations' },
   },
 };
+

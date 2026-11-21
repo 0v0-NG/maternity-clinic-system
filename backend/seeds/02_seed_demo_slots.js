@@ -8,10 +8,10 @@ const { v4: uuidv4 } = require('uuid');
 exports.seed = async function (knex) {
   // 1. Retrieve existing clinics
   const ancClinic = await knex('clinics')
-    .where('name', 'like', '%Antenatal%')
+    .whereRaw('LOWER(name) LIKE ?', ['%antenatal%'])
     .first();
   const pncClinic = await knex('clinics')
-    .where('name', 'like', '%Postnatal%')
+    .whereRaw('LOWER(name) LIKE ?', ['%postnatal%'])
     .first();
 
   if (!ancClinic || !pncClinic) {

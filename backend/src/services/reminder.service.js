@@ -46,16 +46,24 @@ class ReminderService {
     const windowEnd = new Date(targetTime.getTime() + 15 * 60 * 1000);
 
     try {
+      const isPg = db.client.config.client === 'pg';
+      const dateExpr = isPg
+        ? `(schedule_slots.slot_date || ' ' || schedule_slots.start_time)::timestamp`
+        : `datetime(schedule_slots.slot_date || ' ' || schedule_slots.start_time)`;
+      const startVal = isPg
+        ? windowStart.toISOString()
+        : windowStart.toISOString().replace('T', ' ').substring(0, 19);
+      const endVal = isPg
+        ? windowEnd.toISOString()
+        : windowEnd.toISOString().replace('T', ' ').substring(0, 19);
+
       const appointments = await db('appointments')
         .join('schedule_slots', 'appointments.slot_id', 'schedule_slots.id')
         .join('mothers', 'appointments.mother_id', 'mothers.id')
         .join('clinics', 'appointments.clinic_id', 'clinics.id')
         .where('appointments.status', 'booked')
         .where(`appointments.${reminderField}`, false)
-        .whereRaw(`(schedule_slots.slot_date || ' ' || schedule_slots.start_time)::timestamp BETWEEN ? AND ?`, [
-          windowStart.toISOString(),
-          windowEnd.toISOString(),
-        ])
+        .whereRaw(`${dateExpr} BETWEEN ? AND ?`, [startVal, endVal])
         .select(
           'appointments.id',
           'mothers.phone',

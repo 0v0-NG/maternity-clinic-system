@@ -29,7 +29,7 @@ const getAppointmentReport = async (req, res, next) => {
     } else {
       const [year, month] = targetDate.split('-');
       dateFilter = (q) =>
-        q.whereRaw("schedule_slots.slot_date LIKE ?", [`${year}-${month}%`]);
+        q.whereRaw("CAST(schedule_slots.slot_date AS TEXT) LIKE ?", [`${year}-${month}%`]);
     }
 
     let query = db('appointments')
