@@ -38,13 +38,27 @@ export function AuthProvider({ children }) {
     router.push('/login');
   };
 
-  const register = async (phone, name, password) => {
-    const { data } = await authAPI.register({ phone, name, password });
+  const register = async (data) => {
+    const { data: res } = await authAPI.register(data);
+    return res;
+  };
+
+  const verifyOTP = async (motherId, pinId, otp) => {
+    const { data } = await authAPI.verifyOTP({ motherId, pinId, otp });
+    sessionStorage.setItem('token', data.data.token);
+    localStorage.setItem('refreshToken', data.data.refreshToken);
+    localStorage.setItem('user', JSON.stringify(data.data.user));
+    setUser(data.data.user);
+    return data.data.user;
+  };
+
+  const resendOTP = async (phone) => {
+    const { data } = await authAPI.resendOTP({ phone });
     return data;
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, register }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, register, verifyOTP, resendOTP }}>
       {children}
     </AuthContext.Provider>
   );

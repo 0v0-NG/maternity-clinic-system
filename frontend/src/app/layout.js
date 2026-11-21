@@ -1,5 +1,6 @@
 import './globals.css';
 import { Toaster } from 'react-hot-toast';
+import { AuthProvider } from '../hooks/useAuth';
 
 export const metadata = {
   title: 'ANC/PNC Clinic - Appointment System',
@@ -11,7 +12,7 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body className="min-h-screen bg-clinic-50 text-body">
         <Toaster position="top-center" />
-        {children}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );
