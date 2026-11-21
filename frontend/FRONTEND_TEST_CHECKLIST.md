@@ -197,3 +197,138 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
    - Backend returns `400 CUTOFF_PASSED`.
    - Modal displays: *"Appointments cannot be cancelled within 4 hours of the start time. Please contact the front desk."*.
    - Appointment remains booked and active.
+
+
+---
+
+## Step 4: Booking Wizard (`/book`)
+
+### 4.0 Access Control & Route Guard
+1. In an unauthenticated browser / incognito tab, navigate directly to `http://localhost:3000/book`.
+   - **Expected**: Immediately redirected to `/login`.
+2. Log in with a staff account (e.g. `08011112222` / `password123`).
+   - **Expected**: Redirected away to `/staff` (or `/admin`).
+3. Log in as a registered mother.
+   - **Expected**: Successfully access `/book`. The wizard displays header *"Book Appointment"*, *"Step 1 of 3"*, and visual progress bar at 33%. Top displays EmergencyNotice; bottom displays MotherBottomNav with "Book" active.
+
+---
+
+### 4.1 Scenario 1: Antenatal Clinic Booking (Mother Only)
+1. **Step 1 - Clinic & Who It Is For**:
+   - In "1. Choose Clinic", click on **Antenatal Clinic**.
+   - Notice appears under "2. Who is this visit for?": *"Antenatal visits are for the mother only."*.
+   - Confirm: There are no baby checkboxes or baby addition options shown.
+   - Click **Continue to Date & Time**.
+2. **Step 2 - Date & Time (SlotPicker)**:
+   - Wizard progresses to *"Step 2 of 3"* (progress bar at 66%).
+   - Summary chip shows *"Clinic: Antenatal Clinic · For: Mother"*.
+   - SlotPicker shows 14 date pills starting from today.
+   - Click on tomorrow's date (or any date with available slots).
+   - Available time chips appear in 12-hour format (e.g. `8:20 AM`, `8:40 AM`).
+   - Click a slot chip (e.g. `8:20 AM`). The chip turns solid green with outline.
+   - Preview card shows *"Selected Time: 8:20 AM"*.
+   - Click **Continue to Review**.
+3. **Step 3 - Review & Confirm**:
+   - Wizard progresses to *"Step 3 of 3"* (progress bar at 100%).
+   - Summary card shows:
+     - Clinic: **Antenatal Clinic**
+     - Date: Formatted as `DD/MM/YYYY`
+     - Time: `8:20 AM – 8:40 AM (12-Hour Lagos Time)`
+     - Who it is for: **Mother**
+     - Notice: *"You can reschedule or cancel this appointment free of charge up to 4 hours before the scheduled start time via your dashboard."*.
+   - Click **Confirm Booking** (button disables and displays *"Confirming Booking..."* during request).
+4. **Success Screen**:
+   - Success screen loads with green checkmark and header *"Booking Confirmed!"*.
+   - Summary card displays clinic, date, time, and attendee.
+   - Notice: *"SMS reminders will be sent to your registered phone number 24 hours and 2 hours before your appointment."*.
+   - Click **Home** -> Navigates to `/dashboard`, where the Next Appointment card reflects the newly booked Antenatal visit.
+
+---
+
+### 4.2 Scenario 2: Postnatal Clinic Booking for Mother Only ("Me")
+1. Navigate to `/book`.
+2. **Step 1 - Clinic & Who It Is For**:
+   - Select **Postnatal Clinic**.
+   - Section 2 displays three selection buttons: **Me**, **My baby**, **Me & my baby**.
+   - Select **Me** (`booking_type = "mother"`).
+   - Confirm: No baby checkboxes are shown.
+   - Click **Continue to Date & Time**.
+3. **Step 2 - Date & Time**:
+   - Select a date in the next 14 days and choose an available slot chip (e.g. `1:30 PM`).
+   - Click **Continue to Review**.
+4. **Step 3 - Review & Confirm**:
+   - Verify summary card displays:
+     - Clinic: **Postnatal Clinic**
+     - Date: `DD/MM/YYYY`
+     - Time: `1:30 PM – 2:00 PM`
+     - Who it is for: **Mother**
+   - Click **Confirm Booking**.
+   - Success screen displays with confirmation details.
+
+---
+
+### 4.3 Scenario 3: Postnatal Booking with Baby (Inline Baby Creation & Auto-Selection)
+1. Navigate to `/book`.
+2. **Step 1 - Clinic & Who It Is For**:
+   - Select **Postnatal Clinic**.
+   - Select **My baby** (`booking_type = "baby"`).
+   - If mother has no registered babies yet:
+     - The inline mini form displays automatically.
+     - Notice indicates *"Please select or add at least one baby to continue."*, and the continue button is disabled.
+   - Enter baby details in the mini form:
+     - Baby's Name: `Amara Bello`
+     - Date of Birth: Pick a past date (e.g. `2024-05-15`)
+     - Sex: `Female`
+     - Click **Save & Select Baby**.
+     - Toast: *"Baby profile added and selected!"*.
+     - Mini form closes and `Amara Bello` is listed and **checked automatically**.
+   - With at least one baby checked, **Continue to Date & Time** becomes enabled.
+   - Click **Continue to Date & Time**.
+3. **Step 2 & 3**:
+   - Pick date and slot chip.
+   - Review card displays *"Who it is for: Baby (Amara Bello)"*.
+   - Click **Confirm Booking**.
+   - Success screen confirms visit for `Baby (Amara Bello)`.
+
+---
+
+### 4.4 Scenario 4: Postnatal Booking with Twins (Two Babies Selected)
+1. Navigate to `/book`.
+2. **Step 1 - Clinic & Who It Is For**:
+   - Select **Postnatal Clinic**.
+   - Select **Me & my baby** (`booking_type = "both"`).
+   - Click **+ Add Baby** to register a second twin:
+     - Name: `Zainab Bello`
+     - Date of Birth: `2024-05-15`
+     - Sex: `Female`
+     - Click **Save & Select Baby**.
+   - Now in the baby checklist, ensure **both** checkboxes are ticked:
+     - [x] `Amara Bello`
+     - [x] `Zainab Bello`
+   - Click **Continue to Date & Time**.
+3. **Step 2 & 3**:
+   - Pick an available date and time.
+   - On Step 3 Review card, verify attendee line:
+     - *"Who it is for: Mother & Baby (Amara Bello, Zainab Bello)"*.
+   - Click **Confirm Booking**.
+   - Success screen displays booking for twins.
+   - In `/appointments/[id]`, both baby profiles are listed under "Registered Baby Details".
+
+---
+
+### 4.5 Scenario 5: Slot Conflict (`SLOT_TAKEN` / `OVERLAP`)
+1. **Slot Taken Simulation**:
+   - Open two browser tabs on `/book` for two different mothers.
+   - In both tabs, select the exact same clinic, date, and slot chip (e.g. `24/11/2026 at 9:00 AM`).
+   - Proceed to Step 3 in both tabs.
+   - In Tab A, click **Confirm Booking** -> Booking succeeds.
+   - In Tab B, click **Confirm Booking** -> Backend returns `409 SLOT_TAKEN`.
+   - **Expected in Tab B**:
+     - Friendly error toast: *"Another patient just took this slot. Please choose another time."*.
+     - Wizard automatically returns to **Step 2 (Date & Time)**.
+     - Slots automatically refresh so the taken slot is removed from available options.
+     - Mother can cleanly pick an alternative slot without losing clinic or attendee selections.
+2. **Appointment Overlap Simulation**:
+   - Attempt to book a second appointment on the same date/time when an active booking already exists.
+   - Backend returns `409 OVERLAP`.
+   - **Expected**: Error alert displays: *"You already have an appointment at this time."*.

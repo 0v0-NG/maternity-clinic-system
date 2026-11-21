@@ -10,6 +10,7 @@ const SlotPicker = forwardRef(function SlotPicker(
     clinicId,
     selectedSlotId = null,
     onSelectSlot,
+    onDateChange,
     excludeSlotId = null,
     initialDate = null,
     className = '',
@@ -29,11 +30,13 @@ const SlotPicker = forwardRef(function SlotPicker(
     try {
       const res = await clinicAPI.getSlots(cid, dateStr);
       const available = res?.data?.data?.availableSlots || [];
-      const filtered = available.filter((slot) => {
-        if (slot.is_walkin) return false;
-        if (excludeSlotId && slot.id === excludeSlotId) return false;
-        return true;
-      });
+      const filtered = available
+        .filter((slot) => {
+          if (slot.is_walkin) return false;
+          if (excludeSlotId && slot.id === excludeSlotId) return false;
+          return true;
+        })
+        .map((slot) => ({ ...slot, date: dateStr }));
       setSlots(filtered);
     } catch (err) {
       setError('Could not load slots for this date. Please try another.');
@@ -49,6 +52,7 @@ const SlotPicker = forwardRef(function SlotPicker(
         loadSlots(clinicId, selectedDate);
       }
     },
+    getSelectedDate: () => selectedDate,
   }));
 
   useEffect(() => {
@@ -59,6 +63,7 @@ const SlotPicker = forwardRef(function SlotPicker(
 
   const handleDateClick = (dateStr) => {
     setSelectedDate(dateStr);
+    onDateChange && onDateChange(dateStr);
   };
 
   return (
