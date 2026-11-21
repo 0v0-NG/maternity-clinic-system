@@ -109,6 +109,9 @@ export const authAPI = {
 export const motherAPI = {
   getProfile: () => api.get('/mothers/profile'),
   updateProfile: (data) => api.put('/mothers/profile', data),
+  getById: (id) => api.get(`/mothers/${id}`),
+  search: (query) => api.get('/mothers/search', { params: { q: query } }),
+  registerByStaff: (data) => api.post('/mothers', data),
 };
 
 // --- Baby ---

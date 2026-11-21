@@ -646,3 +646,151 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
 3. **Skip Follow-Up Option**:
    - Complete another consultation and click **Skip** in the follow-up modal:
      - Modal closes cleanly without scheduling a follow-up.
+
+---
+
+## 7. STEP 6B: FRONT DESK WALK-IN BOOKINGS & PATIENT MANAGEMENT
+
+### 7.1 Looking Up an Existing Mother
+1. Log in as Front Desk Officer (`+2340000000001` / `password123`) and open `/staff`.
+2. In the Front Desk Reception header, click **Look up a mother**:
+   - The "Look Up Patient Record" modal opens with an autofocus search field.
+3. In the search box, enter at least 3 characters (e.g. `Ami` or `080`):
+   - A loading skeleton pulses while searching.
+   - Matching mother cards appear showing Name, Phone, and number of registered babies.
+4. Click on a patient (e.g. *Mrs. Amina Bello*):
+   - Full read-only profile loads via `GET /api/mothers/:id`.
+   - Displays Name, Phone, Hospital ID, HMO/NHIA Number, Registration Date, and Desk Registration badge (if registered in person).
+   - Lists all registered babies with Name, Gender, and Date of Birth formatted as `DD/MM/YYYY`.
+5. Click **Book appointment for Mrs. Amina Bello**:
+   - Lookup modal closes and the Walk-in Booking Wizard opens immediately with Amina pre-selected at Step 2 (Clinic & Attendee).
+
+---
+
+### 7.2 Registering a New Mother at the Front Desk
+1. In the Front Desk Reception header, click **New walk-in or phone-in booking**:
+   - The 4-step wizard opens at **Step 1: Find Patient**.
+2. In the search field, type a new name (e.g. `Zainab D`) to confirm no match exists:
+   - Notice displays: *"No mother found matching 'Zainab D'"*.
+   - A **Register new mother** button is presented.
+3. Click **Register new mother**:
+   - The inline registration form expands.
+4. **Validation Test (Consent Checkbox)**:
+   - Enter Name: `Zainab Danladi`, Phone: `08099887766`.
+   - Leave the consent checkbox unticked.
+   - Click **Save**:
+     - Form blocks submission and prompts: *"Patient verbal consent is required for staff registration."*.
+5. **Duplicate Phone Test**:
+   - Enter an already registered phone number (e.g. `+2340000000002` or `08012345678`).
+   - Tick the required consent checkbox: *"The mother agrees to her and her baby's data being stored (NDPA 2023)"*.
+   - Click **Save**:
+     - Backend returns 409 `CONFLICT`.
+     - Friendly error displays: *"A patient with this phone number is already registered. Please search for her instead."*.
+     - A quick link *"Search for <phone>"* is provided to switch directly to searching her record.
+6. **Successful Registration**:
+   - Enter a new unique phone number (e.g. `08055443322`).
+   - Enter optional Hospital ID: `HOSP-ZD-01`, HMO Number: `NHIA-9988`.
+   - Ensure the NDPA 2023 consent checkbox is ticked.
+   - Click **Save**:
+     - Patient is registered in backend (`POST /api/mothers`) with `registered_by_staff: true`.
+     - Toast appears: *"Patient registered successfully!"*.
+     - Wizard advances automatically to **Step 2: Clinic & Who it is for** with Zainab selected.
+
+---
+
+### 7.3 Clinic Selection & Adding a Baby for Postnatal Care
+1. At **Step 2 (Clinic & Who it is for)**:
+   - Patient banner at the top shows: `Zainab Danladi · +2348055443322` with a "Change" link.
+2. **Antenatal Clinic Rule**:
+   - Click **Antenatal Clinic**:
+     - Notice displays: *"Antenatal Clinic: The visit is for the mother only."*.
+     - No baby options are shown.
+3. **Postnatal Clinic Rule**:
+   - Click **Postnatal Clinic**:
+     - Question appears: *"Who is this visit for?"* with options: **Mother**, **Baby**, **Mother & baby**.
+4. Select **Baby** (or **Mother & baby**):
+   - Empty state displays: *"No babies registered for this mother yet. Please add a baby below."*.
+   - The **Next** button remains disabled.
+5. Click **Add baby**:
+   - The mini inline baby form opens.
+   - Enter Baby Name: `Baby Hassan`, DOB: `15/10/2026`, Sex: `Male`.
+   - Click **Save**:
+     - Backend creates baby linked to Zainab (`POST /api/babies` with `mother_id`).
+     - Toast: *"Baby profile added!"*.
+     - Mini form collapses.
+     - `Baby Hassan` appears in the baby list **unticked**.
+6. **Twins Handling ("Add another baby")**:
+   - Click **Add baby** again.
+   - Enter Baby Name: `Baby Husseina`, DOB: `15/10/2026`, Sex: `Female`.
+   - Click **Save**:
+     - Both twins now appear as selectable cards.
+7. Tick `Baby Hassan` (and optionally `Baby Husseina`):
+   - **Next** button becomes enabled.
+   - Click **Next** to proceed to Step 3.
+
+---
+
+### 7.4 Selecting Walk-in Time Slot
+1. At **Step 3 (Date & Time)**:
+   - Reusable `SlotPicker` loads with `allowWalkin={true}`, defaulting to today's date in `Africa/Lagos`.
+   - Walk-in slots are clearly marked with amber badges.
+2. Select an available walk-in slot for today (or standard slot).
+3. Selected slot chip highlights in primary green.
+4. Click **Next** to proceed to Step 4.
+
+---
+
+### 7.5 Review & Confirming Walk-in Booking
+1. At **Step 4 (Review & Confirm)**:
+   - Review Card cleanly displays:
+     - **Patient**: `Zainab Danladi (+2348055443322)`
+     - **Clinic**: `Postnatal Clinic`
+     - **Attendee**: `Baby` (`Baby Hassan`)
+     - **Date**: Today's date (`DD/MM/YYYY`)
+     - **Time**: 12-hour Lagos time range (e.g. `11:30 AM – 12:00 PM`)
+     - **Slot Type**: Walk-in Slot badge
+2. Click **Confirm booking**:
+   - Button displays *"Confirming..."* and disables to prevent duplicate submissions.
+   - `POST /api/appointments` is sent with `{ mother_id, clinic_id, slot_id, booking_type: "baby", baby_ids: [...] }`.
+   - On success:
+     - Wizard advances to **Step 5: Booking Confirmed**.
+     - Toast: *"Appointment booked successfully!"*.
+
+---
+
+### 7.6 Checking In Arriving Patient & Queue Ticket Issuance
+1. At **Step 5 (Booking Confirmed)**:
+   - Green confirmation checkmark displays with summary: *"Appointment created for Zainab Danladi at Postnatal Clinic"*.
+   - Two action buttons are presented: **Check in now** (primary) and **Back to list** (outline).
+2. Click **Check in now**:
+   - `POST /api/appointments/:id/checkin` is dispatched.
+   - Toast displays: *"Patient checked in! Queue Ticket: PNC-001"*.
+   - Large prominent Queue Ticket banner appears:
+     - **Ticket PNC-001** (or next sequential queue number for today).
+     - Notice: *"Patient has been added to today's active clinic waiting queue."*.
+   - Button changes to **Back to list**.
+3. Click **Back to list**:
+   - Wizard closes.
+   - Today's Front Desk appointment list automatically reloads.
+   - **Zainab Danladi** appears in today's appointments table showing:
+     - Name: **Zainab Danladi**
+     - Phone: **+2348055443322**
+     - For: **Baby Hassan**
+     - Ticket: **Ticket PNC-001**
+     - Status Badge: **Checked In** (or Waiting)
+4. In the Right Column (Live Queue Panel):
+   - Ticket `PNC-001` is visible in the active waiting queue.
+
+---
+
+### 7.7 Verifying Desk-Registered Mother Cannot Log In
+1. Open a new Incognito / Private window or log out and visit `/login`.
+2. Enter the desk-registered phone number: `08055443322`.
+3. Enter any test password: `Password123!`.
+4. Click **Log in**:
+   - Request sends `POST /api/auth/login`.
+   - Backend responds with status `401 Unauthorized` (`INVALID_CREDENTIALS`).
+   - The application does not crash, throw an uncaught error, or return 500.
+   - Toast displays mapped error: *"Login failed. Please check your details and try again."*.
+   - Patient cannot log in until she completes full self-registration, but continues to receive hospital reminders and live queue updates.
+

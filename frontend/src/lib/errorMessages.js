@@ -5,6 +5,8 @@ export const errorMessages = {
   UNAUTHORIZED: 'Your session has expired. Please log in again.',
   FORBIDDEN: 'You do not have permission to do this.',
   NOT_FOUND: 'The item you are looking for could not be found.',
+  CONFLICT: 'A patient with this phone number is already registered. Please search for her instead.',
+  CONSENT_REQUIRED: 'Patient verbal consent is required for staff registration.',
   SLOT_TAKEN: 'Another patient just took this slot. Please choose another time.',
   OVERLAP: 'You already have an appointment at this time.',
   BOOKING_TYPE_INVALID: 'This booking type is not allowed for the clinic you chose.',

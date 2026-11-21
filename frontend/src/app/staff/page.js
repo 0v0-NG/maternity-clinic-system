@@ -20,6 +20,7 @@ import {
   ArrowRight,
   ShieldAlert,
   Info,
+  Plus,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { clinicAPI, appointmentAPI, queueAPI } from '../../lib/api';
@@ -37,6 +38,8 @@ import StatusBadge from '../../components/StatusBadge';
 import Skeleton from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import SlotPicker from '../../components/SlotPicker';
+import WalkInBookingModal from '../../components/WalkInBookingModal';
+import MotherLookupModal from '../../components/MotherLookupModal';
 
 export default function StaffPortalPage() {
   const router = useRouter();
@@ -76,6 +79,11 @@ export default function StaffPortalPage() {
   const [selectedFollowUpSlot, setSelectedFollowUpSlot] = useState(null);
   const [isBookingFollowUp, setIsBookingFollowUp] = useState(false);
   const [followUpError, setFollowUpError] = useState(null);
+
+  // Walk-in booking & Mother Lookup Modals
+  const [isWalkInModalOpen, setIsWalkInModalOpen] = useState(false);
+  const [isLookupModalOpen, setIsLookupModalOpen] = useState(false);
+  const [preselectedMotherForBooking, setPreselectedMotherForBooking] = useState(null);
 
   // Refs for polling
   const selectedClinicIdRef = useRef(selectedClinicId);
@@ -520,12 +528,32 @@ export default function StaffPortalPage() {
         {/* ================================================================= */}
         {activeTab === 'front_desk' && (
           <div className="space-y-6">
-            {/* Walk-in notice banner */}
-            <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-3.5 flex items-start gap-3 text-xs text-blue-900 leading-relaxed">
-              <Info size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />
+            {/* Front Desk Action Bar: Walk-in Booking & Patient Lookup */}
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-xl border border-border shadow-xs">
               <div>
-                <strong className="font-semibold block">Front Desk Check-in Desk:</strong>
-                Verify arriving patients and issue live queue tickets below. (Note: Walk-in patient creation requires hospital records search API support, as documented in BACKEND_REQUESTS.md).
+                <h2 className="text-sm font-bold text-body">Reception &amp; Front Desk</h2>
+                <p className="text-xs text-body-muted">Manage today&apos;s appointments, book walk-ins, and look up patient records.</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsLookupModalOpen(true)}
+                  className="text-xs h-9 px-3.5 gap-1.5"
+                >
+                  <Search size={14} /> Look up a mother
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={() => {
+                    setPreselectedMotherForBooking(null);
+                    setIsWalkInModalOpen(true);
+                  }}
+                  className="text-xs h-9 px-4 font-bold gap-1.5 shadow-xs"
+                >
+                  <Plus size={15} /> New walk-in or phone-in booking
+                </Button>
               </div>
             </div>
 
@@ -655,9 +683,8 @@ export default function StaffPortalPage() {
                       const isProcessing = actionInProgress === appt.id;
                       const isBooked = appt.status === 'booked';
 
-                      // Patient name or fallback ID
-                      const patientName =
-                        appt.mother_name || `Patient (${appt.mother_id?.substring(0, 8)}...)`;
+                      // Patient name
+                      const patientName = appt.mother_name || 'Patient';
 
                       return (
                         <Card
@@ -902,8 +929,7 @@ export default function StaffPortalPage() {
                     <div className="space-y-3">
                       {clinicInConsultation.map((appt) => {
                         const isProcessing = actionInProgress === appt.id;
-                        const patientName =
-                          appt.mother_name || `Patient (${appt.mother_id?.substring(0, 8)}...)`;
+                        const patientName = appt.mother_name || 'Patient';
                         return (
                           <Card
                             key={appt.id}
@@ -969,8 +995,7 @@ export default function StaffPortalPage() {
                     <div className="space-y-2.5">
                       {clinicWaiting.map((appt, idx) => {
                         const isProcessing = actionInProgress === appt.id;
-                        const patientName =
-                          appt.mother_name || `Patient (${appt.mother_id?.substring(0, 8)}...)`;
+                        const patientName = appt.mother_name || 'Patient';
                         return (
                           <Card
                             key={appt.id}
@@ -1028,8 +1053,7 @@ export default function StaffPortalPage() {
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                       {clinicBooked.map((appt) => {
-                        const patientName =
-                          appt.mother_name || `Patient (${appt.mother_id?.substring(0, 8)}...)`;
+                        const patientName = appt.mother_name || 'Patient';
                         return (
                           <Card
                             key={appt.id}
@@ -1072,8 +1096,7 @@ export default function StaffPortalPage() {
                       ) : (
                         <div className="divide-y divide-border">
                           {clinicCompleted.map((appt) => {
-                            const patientName =
-                              appt.mother_name || `Patient (${appt.mother_id?.substring(0, 8)}...)`;
+                            const patientName = appt.mother_name || 'Patient';
                             return (
                               <div
                                 key={appt.id}
@@ -1120,7 +1143,7 @@ export default function StaffPortalPage() {
                 </h3>
                 <p className="text-xs text-body-muted mt-0.5">
                   Patient:{' '}
-                  {noShowAppt.mother_name || `Patient (${noShowAppt.mother_id?.substring(0, 8)}...)`}
+                  {noShowAppt.mother_name || 'Patient'}
                 </p>
               </div>
             </div>
@@ -1175,7 +1198,7 @@ export default function StaffPortalPage() {
                 <p className="text-xs text-body-muted">
                   Patient:{' '}
                   <strong>
-                    {followUpAppt.mother_name || `Patient (${followUpAppt.mother_id?.substring(0, 8)}...)`}
+                    {followUpAppt.mother_name || 'Patient'}
                   </strong>{' '}
                   · Clinic: <strong>{followUpAppt.clinic_name}</strong>
                 </p>
@@ -1241,6 +1264,31 @@ export default function StaffPortalPage() {
           </div>
         </div>
       )}
+
+      {/* =================================================================== */}
+      {/* DIALOG 3: New Walk-in / Phone-in Booking Wizard Modal               */}
+      {/* =================================================================== */}
+      <WalkInBookingModal
+        isOpen={isWalkInModalOpen}
+        onClose={() => setIsWalkInModalOpen(false)}
+        onBookingComplete={async () => {
+          await loadData(false);
+        }}
+        clinics={clinics}
+        preselectedMother={preselectedMotherForBooking}
+      />
+
+      {/* =================================================================== */}
+      {/* DIALOG 4: Look Up a Mother Modal                                    */}
+      {/* =================================================================== */}
+      <MotherLookupModal
+        isOpen={isLookupModalOpen}
+        onClose={() => setIsLookupModalOpen(false)}
+        onBookForMother={(mother) => {
+          setPreselectedMotherForBooking(mother);
+          setIsWalkInModalOpen(true);
+        }}
+      />
     </div>
   );
 }
