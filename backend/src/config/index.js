@@ -21,7 +21,16 @@ module.exports = {
 
   // JWT Authentication
   jwt: {
-    secret: process.env.JWT_SECRET || 'dev-secret-change-me',
+    secret: (() => {
+      const secret = process.env.JWT_SECRET || (process.env.NODE_ENV === 'test' ? 'test_jwt_secret_min_32_characters_long' : null);
+      if (!secret) throw new Error('FATAL: JWT_SECRET environment variable is missing.');
+      return secret;
+    })(),
+    refreshSecret: (() => {
+      const refreshSecret = process.env.JWT_REFRESH_SECRET || (process.env.NODE_ENV === 'test' ? 'test_jwt_refresh_secret_min_32_chars' : null);
+      if (!refreshSecret) throw new Error('FATAL: JWT_REFRESH_SECRET environment variable is missing.');
+      return refreshSecret;
+    })(),
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
   },

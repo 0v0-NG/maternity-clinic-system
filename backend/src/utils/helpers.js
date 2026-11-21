@@ -1,4 +1,12 @@
 const { v4: uuidv4 } = require('uuid');
+const {
+  LAGOS_TIMEZONE,
+  getLagosToday,
+  formatLagosDateTime,
+  parseLagosDateTime,
+  isWithinCutoffLagos,
+  getReminderWindowLagos,
+} = require('./timezone');
 
 /**
  * Generate a queue number for a clinic on a given date.
@@ -47,16 +55,17 @@ const generateOTP = () => {
 
 /**
  * Check if an appointment can still be cancelled/rescheduled
- * based on the cutoff hours.
- * @param {Date} appointmentDate - The appointment date/time
- * @param {number} cutoffHours - Hours before appointment when changes are locked
+ * based on the cutoff hours (anchored in Africa/Lagos timezone).
+ * @param {string|Date} appointmentDate - The appointment date or slotDate
+ * @param {string|number} [startTimeOrCutoff] - The start_time or cutoffHours
+ * @param {number} [cutoffHours=4] - Hours before appointment when changes are locked
  * @returns {boolean}
  */
-const isWithinCutoff = (appointmentDate, cutoffHours) => {
-  const now = new Date();
-  const cutoff = new Date(appointmentDate);
-  cutoff.setHours(cutoff.getHours() - cutoffHours);
-  return now < cutoff;
+const isWithinCutoff = (appointmentDate, startTimeOrCutoff, cutoffHours = 4) => {
+  if (typeof startTimeOrCutoff === 'number') {
+    return isWithinCutoffLagos(appointmentDate, undefined, startTimeOrCutoff);
+  }
+  return isWithinCutoffLagos(appointmentDate, startTimeOrCutoff, cutoffHours);
 };
 
 /**
@@ -71,4 +80,10 @@ module.exports = {
   generateOTP,
   isWithinCutoff,
   generateId,
+  LAGOS_TIMEZONE,
+  getLagosToday,
+  formatLagosDateTime,
+  parseLagosDateTime,
+  isWithinCutoffLagos,
+  getReminderWindowLagos,
 };

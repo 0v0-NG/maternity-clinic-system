@@ -15,12 +15,25 @@ pg.types.setTypeParser(1700, (val) => (val === null ? null : parseFloat(val)));
 
 /**
  * Knex database configuration.
- * Automatically chooses PostgreSQL if DB_CLIENT=pg or DATABASE_URL is provided,
+ * Automatically chooses SQLite in-memory for testing,
+ * chooses PostgreSQL if DB_CLIENT=pg or DATABASE_URL is provided,
  * otherwise falls back to SQLite (dev.sqlite3) for instant zero-configuration local testing.
  */
-const usePostgres = process.env.DB_CLIENT === 'pg' || !!process.env.DATABASE_URL;
+const isTest = process.env.NODE_ENV === 'test';
+const usePostgres = !isTest && (process.env.DB_CLIENT === 'pg' || !!process.env.DATABASE_URL);
 
-const dbConfig = usePostgres
+const dbConfig = isTest
+  ? {
+      client: 'sqlite3',
+      connection: {
+        filename: ':memory:',
+      },
+      useNullAsDefault: true,
+      pool: { min: 1, max: 1 },
+      migrations: { directory: path.join(__dirname, '../../migrations'), tableName: 'knex_migrations' },
+      seeds: { directory: path.join(__dirname, '../../seeds') },
+    }
+  : usePostgres
   ? {
       client: 'pg',
       connection: process.env.DATABASE_URL

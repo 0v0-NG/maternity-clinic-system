@@ -1,5 +1,6 @@
 const db = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
+const { generateId } = require('../utils/helpers');
 
 /**
  * Get the logged-in mother's profile.
@@ -78,6 +79,15 @@ const getMotherById = async (req, res, next) => {
 
     const babies = await db('babies').where('mother_id', req.params.id)
       .select('id', 'name', 'date_of_birth', 'sex');
+
+    // Audit log: staff viewing mother profile
+    await db('audit_logs').insert({
+      id: generateId(),
+      user_id: req.user.id,
+      action: 'STAFF_VIEW_MOTHER_PROFILE',
+      details: JSON.stringify({ staffId: req.user.id, motherId: req.params.id }),
+      created_at: new Date(),
+    });
 
     res.json({
       success: true,

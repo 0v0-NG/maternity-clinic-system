@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const db = require('../config/database');
 const smsService = require('./sms.service');
 const config = require('../config');
+const { getReminderWindowLagos, parseLagosDateTime } = require('../utils/helpers');
 
 /**
  * Reminder Service
@@ -40,22 +41,13 @@ class ReminderService {
    */
   async sendRemindersForWindow(hours) {
     const reminderField = `reminder_${hours}h_sent`;
-    const now = new Date();
-    const targetTime = new Date(now.getTime() + hours * 60 * 60 * 1000);
-    const windowStart = new Date(targetTime.getTime() - 15 * 60 * 1000);
-    const windowEnd = new Date(targetTime.getTime() + 15 * 60 * 1000);
+    const { startString, endString } = getReminderWindowLagos(hours);
 
     try {
       const isPg = db.client.config.client === 'pg';
       const dateExpr = isPg
         ? `(schedule_slots.slot_date || ' ' || schedule_slots.start_time)::timestamp`
         : `datetime(schedule_slots.slot_date || ' ' || schedule_slots.start_time)`;
-      const startVal = isPg
-        ? windowStart.toISOString()
-        : windowStart.toISOString().replace('T', ' ').substring(0, 19);
-      const endVal = isPg
-        ? windowEnd.toISOString()
-        : windowEnd.toISOString().replace('T', ' ').substring(0, 19);
 
       const appointments = await db('appointments')
         .join('schedule_slots', 'appointments.slot_id', 'schedule_slots.id')
@@ -63,9 +55,10 @@ class ReminderService {
         .join('clinics', 'appointments.clinic_id', 'clinics.id')
         .where('appointments.status', 'booked')
         .where(`appointments.${reminderField}`, false)
-        .whereRaw(`${dateExpr} BETWEEN ? AND ?`, [startVal, endVal])
+        .whereRaw(`${dateExpr} BETWEEN ? AND ?`, [startString, endString])
         .select(
           'appointments.id',
+          'appointments.booked_at',
           'mothers.phone',
           'clinics.name as clinicName',
           'schedule_slots.slot_date as date',
@@ -76,12 +69,32 @@ class ReminderService {
       console.log(`[Reminder] Found ${appointments.length} appointments needing ${hours}h reminder`);
 
       for (const appt of appointments) {
+        // Do not send a 24h reminder for appointments booked less than 24h ahead
+        if (hours === 24) {
+          const appointmentTime = parseLagosDateTime(appt.date, appt.time);
+          const bookedAt = new Date(appt.booked_at);
+          if ((appointmentTime.getTime() - bookedAt.getTime()) < 24 * 60 * 60 * 1000) {
+            await db('appointments')
+              .where('id', appt.id)
+              .where(reminderField, false)
+              .update({ [reminderField]: true });
+            continue;
+          }
+        }
+
         try {
-          await smsService.sendReminder(appt.phone, appt, hours);
-          await db('appointments')
-            .where('id', appt.id)
-            .update({ [reminderField]: true });
+          const smsResult = await smsService.sendReminder(appt.phone, appt, hours);
+          // A failed SMS must not mark the reminder as sent; never send twice
+          if (smsResult && smsResult.success !== false) {
+            await db('appointments')
+              .where('id', appt.id)
+              .where(reminderField, false)
+              .update({ [reminderField]: true });
+          } else {
+            console.error(`[Reminder] Delivery unconfirmed for appointment ${appt.id}`);
+          }
         } catch (err) {
+          // Failed SMS must not mark the reminder as sent
           console.error(`[Reminder] Failed for appointment ${appt.id}:`, err.message);
         }
       }

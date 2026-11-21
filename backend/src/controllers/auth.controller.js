@@ -118,12 +118,26 @@ const login = async (req, res, next) => {
     }
 
     if (!user) {
+      await db('audit_logs').insert({
+        id: generateId(),
+        user_id: null,
+        action: 'LOGIN_FAILURE',
+        details: JSON.stringify({ phone: formattedPhone, reason: 'User not found' }),
+        created_at: new Date(),
+      }).catch(() => {});
       throw new AppError('Invalid phone number or password.', 401, 'UNAUTHORIZED');
     }
 
     // Check password
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
+      await db('audit_logs').insert({
+        id: generateId(),
+        user_id: user.id,
+        action: 'LOGIN_FAILURE',
+        details: JSON.stringify({ phone: formattedPhone, role, reason: 'Invalid password' }),
+        created_at: new Date(),
+      }).catch(() => {});
       throw new AppError('Invalid phone number or password.', 401, 'UNAUTHORIZED');
     }
 
@@ -135,11 +149,11 @@ const login = async (req, res, next) => {
     const token = generateToken({ ...user, role });
     const refreshToken = generateRefreshToken({ ...user, role });
 
-    // Log the action
+    // Log the successful login
     await db('audit_logs').insert({
       id: generateId(),
       user_id: user.id,
-      action: 'LOGIN',
+      action: 'LOGIN_SUCCESS',
       details: JSON.stringify({ phone: formattedPhone, role }),
       created_at: new Date(),
     });
@@ -175,7 +189,7 @@ const refreshToken = async (req, res, next) => {
       throw new AppError('Refresh token is required.', 400);
     }
 
-    const decoded = jwt.verify(token, config.jwt.secret + '_refresh');
+    const decoded = jwt.verify(token, config.jwt.refreshSecret);
     const newToken = generateToken({ id: decoded.id, role: decoded.role, name: decoded.name });
 
     res.json({
@@ -186,6 +200,10 @@ const refreshToken = async (req, res, next) => {
     if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
       return res.status(401).json({
         success: false,
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Invalid or expired refresh token. Please log in again.',
+        },
         message: 'Invalid or expired refresh token. Please log in again.',
       });
     }
@@ -206,7 +224,7 @@ function generateToken(user) {
 function generateRefreshToken(user) {
   return jwt.sign(
     { id: user.id, role: user.role, name: user.name },
-    config.jwt.secret + '_refresh',
+    config.jwt.refreshSecret,
     { expiresIn: config.jwt.refreshExpiresIn }
   );
 }

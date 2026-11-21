@@ -79,4 +79,22 @@ const authorize = (...roles) => {
   };
 };
 
-module.exports = { authenticate, authorize };
+/**
+ * Optional authentication middleware.
+ * Attaches decoded user payload if valid token provided; does not reject otherwise.
+ */
+const optionalAuth = (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      const decoded = jwt.verify(token, config.jwt.secret);
+      req.user = decoded;
+    }
+  } catch (e) {
+    // If token invalid or expired, continue as unauthenticated
+  }
+  next();
+};
+
+module.exports = { authenticate, authorize, optionalAuth };

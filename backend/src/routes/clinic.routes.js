@@ -1,15 +1,15 @@
 const { Router } = require('express');
 const { body } = require('express-validator');
-const { authenticate, authorize } = require('../middleware/auth');
+const { authenticate, authorize, optionalAuth } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const clinicController = require('../controllers/clinic.controller');
 
 const router = Router();
 
-// Public: list clinics and check availability
+// Public: list clinics and check availability (optional auth to identify staff vs mother)
 router.get('/', clinicController.listClinics);
 router.get('/:id', clinicController.getClinic);
-router.get('/:id/slots', clinicController.getAvailableSlots);
+router.get('/:id/slots', optionalAuth, clinicController.getAvailableSlots);
 
 // Admin only
 router.post(

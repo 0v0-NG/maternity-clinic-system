@@ -1,6 +1,6 @@
 const db = require('../config/database');
 const bcrypt = require('bcryptjs');
-const { generateId } = require('../utils/helpers');
+const { generateId, getLagosToday } = require('../utils/helpers');
 const smsService = require('../services/sms.service');
 const { AppError } = require('../middleware/errorHandler');
 
@@ -11,7 +11,7 @@ const { AppError } = require('../middleware/errorHandler');
 const getAppointmentReport = async (req, res, next) => {
   try {
     const { period = 'daily', date } = req.query;
-    const targetDate = date || new Date().toISOString().split('T')[0];
+    const targetDate = date || getLagosToday();
 
     let dateFilter;
     if (period === 'daily') {
@@ -95,7 +95,7 @@ const getNoShowReport = async (req, res, next) => {
  */
 const getClinicLoad = async (req, res, next) => {
   try {
-    const date = req.query.date || new Date().toISOString().split('T')[0];
+    const date = req.query.date || getLagosToday();
 
     const load = await db('schedule_slots')
       .join('clinics', 'schedule_slots.clinic_id', 'clinics.id')
@@ -209,6 +209,15 @@ const cancelSession = async (req, res, next) => {
       reason
     );
 
+    // Audit log
+    await db('audit_logs').insert({
+      id: generateId(),
+      user_id: req.user.id,
+      action: 'CANCEL_SESSION',
+      details: JSON.stringify({ clinic_id, date, reason, affectedAppointments: appointmentIds.length }),
+      created_at: new Date(),
+    });
+
     res.json({
       success: true,
       message: `Session cancelled. ${appointmentIds.length} appointments affected.`,
@@ -252,6 +261,15 @@ const createStaff = async (req, res, next) => {
     const [staff] = await db('staff')
       .insert({ id, name, role, phone, password_hash: passwordHash, created_at: new Date() })
       .returning(['id', 'name', 'role', 'phone']);
+
+    // Audit log (never log password)
+    await db('audit_logs').insert({
+      id: generateId(),
+      user_id: req.user.id,
+      action: 'CREATE_STAFF',
+      details: JSON.stringify({ staffId: id, name, role, phone }),
+      created_at: new Date(),
+    });
 
     res.status(201).json({ success: true, message: 'Staff member created.', data: staff });
   } catch (error) {

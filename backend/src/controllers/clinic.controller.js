@@ -96,7 +96,7 @@ const getAvailableSlots = async (req, res, next) => {
     const { date } = req.query;
     if (!date) throw new AppError('Date query parameter is required.', 400);
 
-    const slots = await db('schedule_slots')
+    let query = db('schedule_slots')
       .leftJoin('appointments', function () {
         this.on('schedule_slots.id', 'appointments.slot_id')
           .andOnIn('appointments.status', ['booked', 'checked_in']);
@@ -104,7 +104,16 @@ const getAvailableSlots = async (req, res, next) => {
       .where('schedule_slots.clinic_id', req.params.id)
       .where('schedule_slots.slot_date', date)
       .where('schedule_slots.is_blocked', false)
-      .whereNull('appointments.id')
+      .whereNull('appointments.id');
+
+    // Exclude walk-in slots when caller is a mother or unauthenticated.
+    // Front desk and admin (staff) can see walk-in slots.
+    const isStaff = req.user && ['front_desk', 'admin', 'midwife', 'doctor'].includes(req.user.role);
+    if (!isStaff) {
+      query = query.where('schedule_slots.is_walkin', false);
+    }
+
+    const slots = await query
       .select(
         'schedule_slots.id',
         'schedule_slots.start_time',

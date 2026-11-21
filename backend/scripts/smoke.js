@@ -136,32 +136,37 @@ async function runSmokeTest() {
       console.log(`[FAIL] Step 4: List Clinics - Status ${clinicsRes.status}`);
       process.exit(1);
     }
-    const clinic = clinicsRes.data.data[0];
-
-    // Find a date with available slots
+    // Find a clinic and date with available non-walkin slots
+    let clinic = null;
     let selectedSlot = null;
     const now = new Date();
-    for (let d = 0; d < 7; d++) {
-      const dt = new Date(now);
-      dt.setDate(now.getDate() + d);
-      const dateStr = dt.toISOString().split('T')[0];
+    const sortedClinics = [...clinicsRes.data.data].sort((a, b) => (b.name === 'Antenatal Clinic' ? 1 : -1));
 
-      const slotsRes = await request(`/clinics/${clinic.id}/slots?date=${dateStr}`);
-      const availableList = slotsRes.data?.data?.availableSlots || [];
-      if (slotsRes.status === 200 && availableList.length) {
-        const available = availableList.find((s) => !s.is_walkin) || availableList[0];
-        if (available) {
-          selectedSlot = { ...available, slot_date: dateStr };
-          break;
+    for (const candClinic of sortedClinics) {
+      for (let d = 0; d < 7; d++) {
+        const dt = new Date(now);
+        dt.setDate(now.getDate() + d);
+        const dateStr = dt.toISOString().split('T')[0];
+
+        const slotsRes = await request(`/clinics/${candClinic.id}/slots?date=${dateStr}`);
+        const availableList = slotsRes.data?.data?.availableSlots || [];
+        if (slotsRes.status === 200 && availableList.length) {
+          const available = availableList.find((s) => !s.is_walkin);
+          if (available) {
+            selectedSlot = { ...available, slot_date: dateStr };
+            clinic = candClinic;
+            break;
+          }
         }
       }
+      if (selectedSlot) break;
     }
 
-    if (!selectedSlot) {
+    if (!selectedSlot || !clinic) {
       console.log('[FAIL] Step 4: List Slots - No unbooked slots found in the next 7 days.');
       process.exit(1);
     }
-    console.log(`[PASS] Step 4: List Slots (Found slot on ${selectedSlot.slot_date} at ${selectedSlot.start_time})`);
+    console.log(`[PASS] Step 4: List Slots (Found slot on ${selectedSlot.slot_date} at ${selectedSlot.start_time} in ${clinic.name})`);
     passedCount++;
 
     // 5. Book Appointment

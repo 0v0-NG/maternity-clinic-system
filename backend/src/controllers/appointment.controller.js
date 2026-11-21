@@ -1,5 +1,12 @@
 const db = require('../config/database');
-const { generateId, isWithinCutoff, generateQueueNumber } = require('../utils/helpers');
+const {
+  generateId,
+  isWithinCutoff,
+  generateQueueNumber,
+  getLagosToday,
+  isWithinCutoffLagos,
+  parseLagosDateTime,
+} = require('../utils/helpers');
 const smsService = require('../services/sms.service');
 const config = require('../config');
 const { AppError } = require('../middleware/errorHandler');
@@ -23,6 +30,11 @@ const bookAppointment = async (req, res, next) => {
 
       if (!slot) throw new AppError('Slot not found.', 404, 'NOT_FOUND');
       if (slot.is_blocked) throw new AppError('This slot is blocked.', 400, 'BAD_REQUEST');
+
+      // Reject mothers attempting to book reserved walk-in slots
+      if (slot.is_walkin && req.user.role === 'mother') {
+        throw new AppError('This slot is reserved for walk-in patients.', 400, 'SLOT_RESERVED');
+      }
 
       // Check if slot is already taken
       const existingBooking = await trx('appointments')
@@ -52,6 +64,9 @@ const bookAppointment = async (req, res, next) => {
 
       // Create the appointment
       const appointmentId = generateId();
+      const apptTime = parseLagosDateTime(slot.slot_date, slot.start_time);
+      const isLessThan24hAhead = (apptTime.getTime() - Date.now()) < 24 * 60 * 60 * 1000;
+
       await trx('appointments')
         .insert({
           id: appointmentId,
@@ -62,7 +77,7 @@ const bookAppointment = async (req, res, next) => {
           status: 'booked',
           booking_type: booking_type || 'mother',
           booked_at: new Date(),
-          reminder_24h_sent: false,
+          reminder_24h_sent: isLessThan24hAhead,
           reminder_2h_sent: false,
         });
 
@@ -146,7 +161,7 @@ const getMyAppointments = async (req, res, next) => {
 
     // Determine view: 'upcoming' (default) vs 'past'
     const isPast = view === 'past' || upcoming === 'false';
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLagosToday();
 
     if (isPast) {
       // Past returns attended ('completed'), cancelled, and no-show appointments, or past dates
@@ -241,8 +256,7 @@ const rescheduleAppointment = async (req, res, next) => {
 
     // Check cutoff
     const slot = await db('schedule_slots').where('id', appointment.slot_id).first();
-    const appointmentDateTime = new Date(`${slot.slot_date}T${slot.start_time}`);
-    if (!isWithinCutoff(appointmentDateTime, config.cancelCutoffHours)) {
+    if (!isWithinCutoffLagos(slot.slot_date, slot.start_time, config.cancelCutoffHours)) {
       throw new AppError(`Cannot reschedule within ${config.cancelCutoffHours} hours of the appointment.`, 400, 'CUTOFF_PASSED');
     }
 
@@ -251,6 +265,9 @@ const rescheduleAppointment = async (req, res, next) => {
       const newSlot = await trx('schedule_slots').where('id', new_slot_id).forUpdate().first();
       if (!newSlot) throw new AppError('New slot not found.', 404, 'NOT_FOUND');
       if (newSlot.is_blocked) throw new AppError('This slot is blocked.', 400, 'BAD_REQUEST');
+      if (newSlot.is_walkin && req.user.role === 'mother') {
+        throw new AppError('This slot is reserved for walk-in patients.', 400, 'SLOT_RESERVED');
+      }
 
       const taken = await trx('appointments')
         .where('slot_id', new_slot_id)
@@ -300,6 +317,15 @@ const rescheduleAppointment = async (req, res, next) => {
       console.error('[Appointment] Reschedule SMS failed:', smsErr.message);
     }
 
+    // Audit log
+    await db('audit_logs').insert({
+      id: generateId(),
+      user_id: req.user.id,
+      action: 'RESCHEDULE_APPOINTMENT',
+      details: JSON.stringify({ appointmentId: req.params.id, old_slot_id: appointment.slot_id, new_slot_id }),
+      created_at: new Date(),
+    });
+
     res.json({ success: true, message: 'Appointment rescheduled successfully.' });
   } catch (error) {
     next(error);
@@ -320,8 +346,7 @@ const cancelAppointment = async (req, res, next) => {
     if (appointment.status !== 'booked') throw new AppError('Only booked appointments can be cancelled.', 400, 'BAD_REQUEST');
 
     const slot = await db('schedule_slots').where('id', appointment.slot_id).first();
-    const appointmentDateTime = new Date(`${slot.slot_date}T${slot.start_time}`);
-    if (!isWithinCutoff(appointmentDateTime, config.cancelCutoffHours)) {
+    if (!isWithinCutoffLagos(slot.slot_date, slot.start_time, config.cancelCutoffHours)) {
       throw new AppError(`Cannot cancel within ${config.cancelCutoffHours} hours of the appointment.`, 400, 'CUTOFF_PASSED');
     }
 
@@ -340,6 +365,15 @@ const cancelAppointment = async (req, res, next) => {
     } catch (smsErr) {
       console.error('[Appointment] Cancel SMS failed:', smsErr.message);
     }
+
+    // Audit log
+    await db('audit_logs').insert({
+      id: generateId(),
+      user_id: req.user.id,
+      action: 'CANCEL_APPOINTMENT',
+      details: JSON.stringify({ appointmentId: req.params.id, slot_id: appointment.slot_id }),
+      created_at: new Date(),
+    });
 
     res.json({ success: true, message: 'Appointment cancelled.' });
   } catch (error) {
@@ -363,7 +397,7 @@ const checkIn = async (req, res, next) => {
     if (appointment.status !== 'booked') throw new AppError('Only booked appointments can be checked in.', 400);
 
     // Count today's check-ins for this clinic to generate queue number
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLagosToday();
     const checkedInCount = await db('appointments')
       .join('schedule_slots', 'appointments.slot_id', 'schedule_slots.id')
       .where('appointments.clinic_id', appointment.clinic_id)
@@ -383,6 +417,15 @@ const checkIn = async (req, res, next) => {
         checked_in_at: new Date(),
         updated_at: new Date(),
       });
+
+    // Audit log
+    await db('audit_logs').insert({
+      id: generateId(),
+      user_id: req.user.id,
+      action: 'CHECKIN_PATIENT',
+      details: JSON.stringify({ appointmentId: req.params.id, queueNumber }),
+      created_at: new Date(),
+    });
 
     res.json({
       success: true,
@@ -413,6 +456,15 @@ const updateStatus = async (req, res, next) => {
     await db('appointments')
       .where('id', req.params.id)
       .update({ status, updated_at: new Date() });
+
+    // Audit log
+    await db('audit_logs').insert({
+      id: generateId(),
+      user_id: req.user.id,
+      action: 'UPDATE_APPOINTMENT_STATUS',
+      details: JSON.stringify({ appointmentId: req.params.id, previous_status: appointment.status, status }),
+      created_at: new Date(),
+    });
 
     res.json({ success: true, message: `Appointment status updated to ${status}.` });
   } catch (error) {

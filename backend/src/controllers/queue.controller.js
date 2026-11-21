@@ -1,5 +1,6 @@
 const db = require('../config/database');
 const { AppError } = require('../middleware/errorHandler');
+const { getLagosToday } = require('../utils/helpers');
 
 /**
  * Get today's queue for a clinic.
@@ -7,7 +8,7 @@ const { AppError } = require('../middleware/errorHandler');
  */
 const getTodayQueue = async (req, res, next) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLagosToday();
 
     const queue = await db('appointments')
       .join('schedule_slots', 'appointments.slot_id', 'schedule_slots.id')
@@ -26,13 +27,22 @@ const getTodayQueue = async (req, res, next) => {
       )
       .orderBy('appointments.checked_in_at', 'asc');
 
+    const isStaff = req.user && ['front_desk', 'midwife', 'doctor', 'admin'].includes(req.user.role);
+    const sanitizedQueue = isStaff
+      ? queue
+      : queue.map((q) => ({
+          queue_number: q.queue_number,
+          status: q.status,
+          checked_in_at: q.checked_in_at,
+        }));
+
     res.json({
       success: true,
       data: {
         clinicId: req.params.clinicId,
         date: today,
-        queue,
-        totalInQueue: queue.length,
+        queue: sanitizedQueue,
+        totalInQueue: sanitizedQueue.length,
         currentlyServing: queue.find((q) => q.status === 'in_consultation')?.queue_number || null,
       },
     });
@@ -51,7 +61,12 @@ const getQueuePosition = async (req, res, next) => {
       .where('id', req.params.appointmentId)
       .first();
 
-    if (!appointment) throw new AppError('Appointment not found.', 404);
+    if (!appointment) throw new AppError('Appointment not found.', 404, 'NOT_FOUND');
+
+    // Security: Only owning mother or staff can view queue position
+    if (req.user.role === 'mother' && appointment.mother_id !== req.user.id) {
+      throw new AppError('Access denied.', 403, 'FORBIDDEN');
+    }
 
     if (!['checked_in', 'waiting'].includes(appointment.status)) {
       return res.json({
@@ -68,7 +83,7 @@ const getQueuePosition = async (req, res, next) => {
     }
 
     // Count how many people checked in before this patient
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLagosToday();
     const ahead = await db('appointments')
       .join('schedule_slots', 'appointments.slot_id', 'schedule_slots.id')
       .where('appointments.clinic_id', appointment.clinic_id)

@@ -41,6 +41,9 @@ class SMSService {
       });
 
       const data = await response.json();
+      if (!response.ok || (data.code && data.code !== 'ok' && !data.message_id)) {
+        throw new Error(data.message || 'SMS delivery failed');
+      }
       console.log(`[SMS] Sent to ${phone}: ${message.substring(0, 50)}...`);
       return data;
     } catch (error) {
