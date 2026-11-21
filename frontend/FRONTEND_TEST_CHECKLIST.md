@@ -525,3 +525,124 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
    - Amber alert explains that days shown are indicative schedules, and actual booking availability is determined by the live booking calendar.
 4. **Verify Centered CTA**:
    - Centered **Book Appointment** button links directly to `/book`.
+
+---
+
+## Step 6: Staff Portal (`/staff`) - Front Desk & Clinical Views
+
+### 6.1 Access Control & Role Gate
+1. **Mother Redirection**:
+   - Log in as a mother (`+2348012345678`).
+   - In browser address bar, navigate to `http://localhost:3000/staff`.
+   - **Expected**: Mother is immediately redirected to `/dashboard`.
+2. **Unauthenticated Redirection**:
+   - Open `/staff` in an incognito window with no stored auth token.
+   - **Expected**: Redirected immediately to `/login`.
+3. **Role-Based Views**:
+   - Log in as Front Desk (`+2340000000004` / `password123`):
+     - Displays **Front Desk View** (check-in list and live queue panel).
+     - No `/book` link is visible.
+   - Log in as Midwife (`+2340000000003` / `password123`) or Doctor (`+2340000000002` / `password123`):
+     - Displays **Clinical Consultation View** (grouped patient lounge and room queues).
+   - Log in as Administrator (`+2340000000001` / `password123`):
+     - Displays both views as selectable tabs: *"Front Desk View"* and *"Clinical Consultation View"*.
+
+---
+
+### 6.2 Scenario 1: Front Desk Check-In and Live Queue Verification
+
+#### A. Booking an Appointment for Today (as Mother)
+1. In Tab A, log in as test mother (`+2348012345678` / `123456`).
+2. Navigate to `/book`.
+3. Select **Antenatal Clinic** -> Click **Next**.
+4. In SlotPicker, select **Today's** date chip (first chip).
+5. Pick an available slot for today -> Click **Next** -> Click **Confirm booking**.
+6. Note down the scheduled time (e.g. `11:00 AM – 11:20 AM`).
+
+#### B. Mother's Pre-Check-in Queue View
+1. Still in Tab A (Mother), navigate to `/queue`.
+2. Verify amber notice card displays:
+   - *"You have not checked in yet"*.
+   - *"Please check in at the front desk when you arrive at the hospital."*.
+   - Status badge shows green: **Booked**.
+
+#### C. Front Desk Check-in (`/staff`)
+1. In Tab B, log in as Front Desk staff (`+2340000000004` / `password123`).
+2. Navigate to `/staff`.
+3. **Verify Header & Top Controls**:
+   - Header shows staff name: *"Mr. Chukwu"* and role badge *"Front Desk Officer"*.
+   - Clinic selector defaults to *"Antenatal Clinic"*.
+   - Date selector defaults to today's date in Lagos time (`YYYY-MM-DD`).
+   - Count chips show counts: Booked, Checked In, Completed, No-Show, Cancelled.
+4. **Locate Mother's Booking**:
+   - Locate the booked appointment in today's list.
+   - Verify card details: scheduled time, attendee, and green **Booked** status badge.
+5. **Execute Check-In**:
+   - On the appointment card, click **Check In**.
+   - Button disables and briefly displays *"Processing..."*.
+   - **Expected Result**:
+     - Success toast appears: *"Patient checked in! Queue Ticket: ANC-001"* (or assigned ticket number, with `(Marked Late)` if arriving after 15-minute grace period).
+     - Appointment status updates to **Checked In** with assigned ticket number.
+     - Count chips update: Booked count decreases, Checked In count increases.
+     - Live Queue Tracker on the right panel adds the patient with ticket `ANC-001` and status *"Waiting"*.
+
+#### D. Verify Live Ticket on Mother's Queue Page
+1. Switch back to Tab A (Mother's `/queue` page).
+2. Within 20 seconds (or after clicking **Refresh**):
+   - Amber "Not checked in" notice disappears.
+   - Screen displays large ticket number: **ANC-001**.
+   - Queue Position displays: **#1** (*"You are number 1 in the queue"*).
+   - Status badge updates to teal: **Checked In**.
+   - Live queue updates in real-time.
+
+#### E. No-Show Marking
+1. In Tab B (Front Desk), locate a booked appointment.
+2. Click **No-show**:
+   - Confirmation dialog opens: *"Mark as No-Show?"*.
+   - Explanatory rule: *"Appointments may only be marked as No-show after the appointment start time plus grace period (15 mins) has passed."*.
+3. Click **Confirm No-Show**:
+   - If attempted before `start_time + 15m` has passed:
+     - Error toast appears with mapped friendly message: *"You cannot mark this as a no-show yet. Please wait until after your appointment time."*.
+   - If grace period has expired:
+     - Status updates cleanly to **No-Show**.
+
+---
+
+### 6.3 Scenario 2: Clinical Consultation Queue (`midwife` / `doctor`)
+
+#### A. Consultation Queue Layout
+1. Log in as Nurse Fatima (`+2340000000003` / `password123`).
+2. Verify Clinical Consultation View opens automatically.
+3. **Verify 4 Queue Sections**:
+   - **Currently In Consultation**: Empty notice or active patient in room.
+   - **Waiting in Lounge**: List of checked-in patients in arrival order with ticket numbers.
+   - **Not Yet Arrived**: Booked appointments scheduled for today.
+   - **Done Today**: Collapsed accordion showing completed consultations.
+
+#### B. Calling in a Patient ("Call In")
+1. In **Waiting in Lounge**, locate patient with ticket `ANC-001`.
+2. Click **Call In**:
+   - Button shows *"Calling..."*.
+   - Status updates to `in_consultation`.
+   - Patient moves to the **Currently In Consultation** section.
+   - Live Queue panel updates "Now Serving" to `ANC-001`.
+3. In Mother's Tab A (`/queue`):
+   - Screen updates to: *"It's your turn!"* with pulsating green check icon and instructions to enter the room.
+
+#### C. Finishing Consultation & Follow-up Scheduling ("Finish")
+1. In **Currently In Consultation**, click **Finish**:
+   - Status updates to `completed`.
+   - Toast displays: *"Consultation completed."*.
+   - Mother moves to **Done Today** completed section.
+2. **Follow-Up Booking Modal**:
+   - Modal immediately opens: *"Book Follow-Up Appointment?"*.
+   - Patient and clinic are pre-selected.
+   - Reusable SlotPicker displays upcoming dates with walk-in and regular slots.
+   - Select a date next week and click an available slot chip (e.g. `9:00 AM`).
+   - Click **Book Follow-Up**:
+     - Follow-up appointment is created in backend (`POST /api/appointments/follow-up`).
+     - Toast: *"Follow-up appointment booked successfully."*.
+     - Modal closes.
+3. **Skip Follow-Up Option**:
+   - Complete another consultation and click **Skip** in the follow-up modal:
+     - Modal closes cleanly without scheduling a follow-up.

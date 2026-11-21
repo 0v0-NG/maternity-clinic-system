@@ -13,6 +13,7 @@ const SlotPicker = forwardRef(function SlotPicker(
     onDateChange,
     excludeSlotId = null,
     initialDate = null,
+    allowWalkin = false,
     className = '',
   },
   ref
@@ -32,7 +33,7 @@ const SlotPicker = forwardRef(function SlotPicker(
       const available = res?.data?.data?.availableSlots || [];
       const filtered = available
         .filter((slot) => {
-          if (slot.is_walkin) return false;
+          if (!allowWalkin && slot.is_walkin) return false;
           if (excludeSlotId && slot.id === excludeSlotId) return false;
           return true;
         })
@@ -134,6 +135,11 @@ const SlotPicker = forwardRef(function SlotPicker(
                   }`}
                 >
                   {formattedTime}
+                  {slot.is_walkin && (
+                    <span className={`text-[9px] font-bold px-1 py-0.5 rounded ml-1 ${isSelected ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'}`}>
+                      Walk-in
+                    </span>
+                  )}
                 </button>
               );
             })}
