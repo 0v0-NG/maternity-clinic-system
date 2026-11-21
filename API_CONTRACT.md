@@ -108,6 +108,7 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
 #### `GET /api/clinic-info`
 - **Role**: Public
 - **Description**: Returns hospital metadata, operating days/hours, emergency unit contact, and Google Maps location link. Values are read from `backend/src/config/clinicInfo.js`.
+- **Note on Demonstration Placeholders**: The hospital name, address, phone numbers, and operating days/hours are demo placeholders until verified during institutional hospital interviews. Client calendar interfaces must fetch available dates dynamically from `GET /api/clinics/:id/slots?date=YYYY-MM-DD` rather than hardcoding day-of-week filters.
 - **Success Response (200 OK)**:
 ```json
 {
@@ -119,19 +120,26 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
       "antenatal": {
         "days": [
           "Monday",
+          "Tuesday",
           "Wednesday",
+          "Thursday",
           "Friday"
         ],
         "hours": "08:00 - 12:00",
-        "slotDurationMinutes": 20
+        "slotDurationMinutes": 20,
+        "description": "Antenatal clinic sessions run Monday through Friday mornings (08:00 - 12:00) with 20-minute consultation slots."
       },
       "postnatal": {
         "days": [
+          "Monday",
           "Tuesday",
-          "Thursday"
+          "Wednesday",
+          "Thursday",
+          "Friday"
         ],
         "hours": "13:00 - 16:00",
-        "slotDurationMinutes": 30
+        "slotDurationMinutes": 30,
+        "description": "Postnatal clinic sessions run Monday through Friday afternoons (13:00 - 16:00) with 30-minute consultation slots."
       }
     },
     "emergencyUnitNumber": "+2348001122334",
@@ -1219,9 +1227,11 @@ The tables below map every user screen action to its corresponding backend endpo
 
 ## 6. Clinical Booking & Operating Rules
 
-1. **Clinic Timetables & Slot Durations**:
-   - **Antenatal Clinic (ANC)**: 20 minutes per slot (operating Monday, Wednesday, Friday: 08:00 - 12:00).
-   - **Postnatal Clinic (PNC)**: 30 minutes per slot (operating Tuesday, Thursday: 13:00 - 16:00).
+1. **Clinic Timetables & Slot Durations (Placeholder Notice)**:
+   - All clinic operating days, hours, and hospital contacts in `/api/clinic-info` are **demonstration placeholders** subject to finalization during institutional hospital interviews.
+   - **Antenatal Clinic (ANC)**: 20 minutes per slot (placeholder hours: 08:00 - 12:00).
+   - **Postnatal Clinic (PNC)**: 30 minutes per slot (placeholder hours: 13:00 - 16:00).
+   - **Dynamic Calendar Availability**: Client booking UIs must determine bookable dates and times dynamically by querying `GET /api/clinics/:id/slots?date=YYYY-MM-DD` rather than hardcoding static day filters in the frontend. For testing and demonstration, `npm run seed:demo` generates slots across 5 consecutive calendar days (including weekends), while `POST /api/admin/slots/generate` defaults to weekdays Monday–Friday unless custom weekdays (0-6) are provided.
 2. **Booking Types per Clinic**:
    - **Antenatal Clinic**: Accepts `booking_type: "mother"` only.
    - **Postnatal Clinic**: Accepts `booking_type: "mother"`, `"baby"`, or `"both"`.
