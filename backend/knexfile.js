@@ -18,6 +18,8 @@ module.exports = {
           ? {
               connectionString: process.env.DATABASE_URL,
               ssl: process.env.DB_SSL === 'true' || process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+              keepAlive: true,
+              keepAliveInitialDelayMillis: 10000,
             }
           : {
               host: config.db.host,
@@ -32,8 +34,17 @@ module.exports = {
           acquireTimeoutMillis: 30000,
           createTimeoutMillis: 30000,
           destroyTimeoutMillis: 5000,
-          idleTimeoutMillis: 30000,
+          idleTimeoutMillis: 5000,
           reapIntervalMillis: 1000,
+          afterCreate: (connection, done) => {
+            connection.on('error', (err) => {
+              console.warn('[DB] Handled pool connection error:', err.message);
+            });
+            done(null, connection);
+          },
+          validate: (client) => {
+            return !client._ending && client.connection && !client.connection.stream?.destroyed;
+          },
         },
         acquireConnectionTimeout: 30000,
         migrations: { directory: './migrations', tableName: 'knex_migrations' },

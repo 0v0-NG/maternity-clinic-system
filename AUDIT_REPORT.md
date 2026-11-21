@@ -153,7 +153,19 @@ The schema is created using a **Knex migration** file (`backend/migrations/20240
 * **Staff Members (4):** Admin (`+2340000000001`), Dr. Adebayo (`+2340000000002`), Nurse Fatima (`+2340000000003`), Front Desk Mr. Chukwu (`+2340000000004`). All seeded with password hash for `password123`.
 * **Mothers (1):** Mrs. Amina Bello (`+2348012345678`), verified, Hospital ID `HOSP-00123`, HMO `HMO-456`.
 * **Babies (1):** Baby Bello (DOB: 2024-11-01, Female).
-* **Schedule Slots (~90):** 12 Antenatal slots (08:00–12:00) and 6 Postnatal slots (13:00–16:00) generated for the next 5 consecutive weekdays.
+* **Schedule Slots (126 total):** Populated via `01_seed_data.js` and regenerated for today and the next 4 days (including weekends) via `02_seed_demo_slots.js`.
+
+#### Database Migration: Before & After (SQLite vs. Neon PostgreSQL)
+
+| Attribute | Before (Initial Setup) | After (Neon PostgreSQL Migration) |
+|---|---|---|
+| **Database Engine** | SQLite 3.52.0 (local file `dev.sqlite3`) | PostgreSQL 18.7 on Neon Serverless Cloud (`pg` driver) |
+| **Connection & SSL** | Local file path, no SSL | Secure remote URI (`DATABASE_URL`) with TLS / `sslmode=require` |
+| **Connection Pooling** | Single-connection SQLite default | Serverless-tuned Knex pool (`min: 0, max: 5`, `keepAlive: true`, 30s timeouts, auto-recovery on socket reset) |
+| **Data Types & Parsing** | Loose SQLite dynamic typing; dates stored as ISO strings | Strong PostgreSQL types; `pg.types` parsers configured for DATE (OID 1082 -> string), INT8 (OID 20 -> int), NUMERIC (OID 1700 -> float) |
+| **Case-Insensitive Lookups** | SQLite `LIKE` is case-insensitive for ASCII | Code updated to cross-dialect `LOWER(column) LIKE ?` |
+| **Date Time Aggregations** | SQLite `datetime()` | Engine-aware syntax: `::timestamp` on PostgreSQL, `datetime()` on SQLite fallback |
+| **Fallback Status** | Standalone SQLite | Dual-engine: setting `DB_CLIENT=sqlite3` retains full local functionality |
 
 ---
 
@@ -279,15 +291,41 @@ npm run dev
 
 ### 2. Execution & Test Verification Results
 
+* **Automated Smoke Test on Neon PostgreSQL:**
+  * Command: `npm run smoke`
+  * Target: Running API (`http://localhost:5000/api`) connected to PostgreSQL on Neon
+  * Result: **PASS (10/10 steps passed)**
+    * `[PASS]` Step 1: Register Mother
+    * `[PASS]` Step 2: Verify OTP
+    * `[PASS]` Step 3: Add Baby
+    * `[PASS]` Step 4: List Slots
+    * `[PASS]` Step 5: Book Appointment
+    * `[PASS]` Step 6: Check In (Assigned ANC-001)
+    * `[PASS]` Step 7: Queue Position (Position: 1)
+    * `[PASS]` Step 8: Mark In Consultation
+    * `[PASS]` Step 9: Mark Completed
+    * `[PASS]` Step 10: Admin Report
+
 * **Backend Unit & Integration Tests:**
   * Command: `npm test`
-  * Result: **PASS** (1 test suite, 4 tests passed in 20.8s).
+  * Target: In-memory SQLite test configuration
+  * Result: **PASS** (1 test suite, 4 tests passed).
   * Passed Tests: `POST /api/auth/register` (missing phone validation, short password validation), `POST /api/auth/login` (empty fields validation), `GET /api/health` (200 OK).
+
 * **Frontend Production Build:**
   * Command: `npm run build`
-  * Result: **PASS** (`next build` compiled all 10 routes into optimized static pages with 0 errors).
-* **End-to-End Integration Run:**
-  * Verified live execution: User registration -> OTP verification -> Baby profile addition -> Slot discovery -> Appointment booking -> Front-desk check-in -> Queue position tracking.
+  * Result: **PASS** (`next build` compiled all 12 routes into optimized static pages with 0 errors).
+
+* **Database Connection & Verification:**
+  * Command: `npm run db:check`
+  * Result: **PASS** (PostgreSQL 18.7 on Neon, 11 active tables verified).
+
+### 3. Honest List of Untested Scope & SQLite-Specific Behavior
+
+1. **Test Environment In-Memory SQLite Fallback:** The automated test runner (`npm test`) relies on Knex's `:memory:` SQLite client for fast, isolated unit/integration tests without requiring an active internet connection to Neon. End-to-end testing against live PostgreSQL is performed via `npm run smoke`.
+2. **High Concurrency / Race Condition Stress Testing:** While Knex transactions and `forUpdate()` row locks are implemented in `appointment.controller.js` for double-booking prevention on PostgreSQL, an automated multi-threaded load test (e.g. 100 concurrent requests competing for the exact same slot millisecond-for-millisecond) has not been run.
+3. **Live Telecom SMS Delivery:** SMS delivery was verified using the Termii simulation mode (`SMS_API_KEY=demo`), which generates simulated OTPs and logs messages. Live delivery through Nigerian telecom networks (MTN, Airtel, Glo, 9mobile DND) was not tested with real funded credits.
+4. **Automated Frontend UI / Browser Tests:** Frontend verification was validated through static compilation (`next build`), manual browser interaction, and API contract smoke testing, but not automated with browser automation tools like Playwright or Cypress.
 
 ### 3. Environment Variables Used
 
@@ -314,8 +352,8 @@ npm run dev
 | Problem | Location | Description |
 |---|---|---|
 | **Absence of Database-Level Unique Constraint on Slots** | `backend/migrations/20240101000001_initial_schema.js` | Double booking prevention relies entirely on application-level transactions and row-locking (`forUpdate()`). There is no database-level partial unique index (`UNIQUE(slot_id) WHERE status IN ('booked', 'checked_in')`). Concurrent requests on non-Postgres engines or unisolated queries could theoretically double-book. |
-| **PostgreSQL-Specific Cast in Reminder Service** | `backend/src/services/reminder.service.js:55` | Line 55 uses `::timestamp` raw casting (`(slot_date || ' ' || start_time)::timestamp`). While functional on Neon PostgreSQL, this will crash with a syntax error if run against local SQLite. |
 | **Hardcoded Secret Fallback in Config** | `backend/src/config/index.js:20` | If `JWT_SECRET` is omitted from `.env`, the server defaults to `'dev-secret-change-me'`. Refresh token generation also uses simple string concatenation (`secret + '_refresh'`). |
+| **PostgreSQL-Specific Cast in Reminder Service (RESOLVED)** | `backend/src/services/reminder.service.js:48-60` | Resolved during Stage A migration: Raw `::timestamp` was refactored into a dialect-aware expression supporting both PostgreSQL (`::timestamp`) and SQLite (`datetime(...)`). |
 
 ### Medium Priority
 

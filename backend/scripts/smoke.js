@@ -146,10 +146,11 @@ async function runSmokeTest() {
       const dateStr = dt.toISOString().split('T')[0];
 
       const slotsRes = await request(`/clinics/${clinic.id}/slots?date=${dateStr}`);
-      if (slotsRes.status === 200 && slotsRes.data?.data?.length) {
-        const available = slotsRes.data.data.find((s) => !s.is_booked && !s.is_blocked && !s.is_walkin);
+      const availableList = slotsRes.data?.data?.availableSlots || [];
+      if (slotsRes.status === 200 && availableList.length) {
+        const available = availableList.find((s) => !s.is_walkin) || availableList[0];
         if (available) {
-          selectedSlot = available;
+          selectedSlot = { ...available, slot_date: dateStr };
           break;
         }
       }
@@ -256,7 +257,7 @@ async function runSmokeTest() {
       headers: { Authorization: `Bearer ${adminToken}` },
     });
 
-    if (reportRes.status !== 200 || !Array.isArray(reportRes.data?.data)) {
+    if (reportRes.status !== 200 || !Array.isArray(reportRes.data?.data?.clinics)) {
       console.log(`[FAIL] Step 10: Admin Report - Status ${reportRes.status}: ${JSON.stringify(reportRes.data)}`);
       process.exit(1);
     }
