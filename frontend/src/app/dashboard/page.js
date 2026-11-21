@@ -8,6 +8,7 @@ import {
   Clock,
   User,
   PlusCircle,
+  Plus,
   LogOut,
   ChevronRight,
   Heart,
@@ -148,41 +149,52 @@ export default function DashboardPage() {
               <Skeleton height={44} className="w-full rounded-xl mt-2" />
             </Card>
           ) : nextAppointment ? (
-            <Card className="p-5 border-primary-200 shadow-sm space-y-3">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h3 className="font-bold text-clinic-dark text-base">
-                    {nextAppointment.clinic_name}
-                  </h3>
-                  <p className="text-xs text-body-muted mt-0.5">
-                    For: {formatWhoFor(nextAppointment.booking_type, nextAppointment.babies)}
-                  </p>
+            <div className="space-y-3">
+              <Card className="p-5 border-primary-200 shadow-sm space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h3 className="font-bold text-clinic-dark text-base">
+                      {nextAppointment.clinic_name}
+                    </h3>
+                    <p className="text-xs text-body-muted mt-0.5">
+                      For: {formatWhoFor(nextAppointment.booking_type, nextAppointment.babies)}
+                    </p>
+                  </div>
+                  <StatusBadge
+                    status={nextAppointment.status}
+                    late_arrival={nextAppointment.late_arrival}
+                  />
                 </div>
-                <StatusBadge
-                  status={nextAppointment.status}
-                  late_arrival={nextAppointment.late_arrival}
-                />
-              </div>
 
-              <div className="bg-clinic-50 rounded-xl p-3 text-xs space-y-1.5 border border-primary-100">
-                <div className="flex items-center gap-2 text-body">
-                  <Calendar size={14} className="text-primary-600 flex-shrink-0" />
-                  <span className="font-semibold">{formatDate(nextAppointment.slot_date)}</span>
+                <div className="bg-clinic-50 rounded-xl p-3 text-xs space-y-1.5 border border-primary-100">
+                  <div className="flex items-center gap-2 text-body">
+                    <Calendar size={14} className="text-primary-600 flex-shrink-0" />
+                    <span className="font-semibold">{formatDate(nextAppointment.slot_date)}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-body">
+                    <Clock size={14} className="text-primary-600 flex-shrink-0" />
+                    <span>
+                      {formatTimeRange(nextAppointment.start_time, nextAppointment.end_time)}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-body">
-                  <Clock size={14} className="text-primary-600 flex-shrink-0" />
-                  <span>
-                    {formatTimeRange(nextAppointment.start_time, nextAppointment.end_time)}
-                  </span>
-                </div>
-              </div>
 
-              <Link href={`/appointments/${nextAppointment.id}`} className="block pt-1">
-                <Button variant="secondary" className="w-full text-xs">
-                  View Appointment Details
-                </Button>
-              </Link>
-            </Card>
+                <Link href={`/appointments/${nextAppointment.id}`} className="block pt-1">
+                  <Button variant="secondary" className="w-full text-xs">
+                    View Appointment Details
+                  </Button>
+                </Link>
+              </Card>
+
+              {/* Centered Book appointment button below the card */}
+              <div className="flex justify-center pt-1">
+                <Link href="/book" className="w-full sm:w-auto sm:max-w-xs block">
+                  <Button variant="primary" className="w-full sm:w-auto sm:max-w-xs sm:px-8 text-sm gap-1.5">
+                    <Plus size={16} /> Book Appointment
+                  </Button>
+                </Link>
+              </div>
+            </div>
           ) : (
             <Card className="p-6">
               <EmptyState
@@ -190,9 +202,9 @@ export default function DashboardPage() {
                 title="No Upcoming Appointment"
                 description="You have no visits scheduled right now. Book your next visit with the clinic easily."
                 action={
-                  <Link href="/book">
-                    <Button variant="primary" className="px-6 text-sm">
-                      Book Appointment
+                  <Link href="/book" className="w-full sm:w-auto sm:max-w-xs block">
+                    <Button variant="primary" className="w-full sm:w-auto sm:max-w-xs sm:px-8 text-sm gap-1.5">
+                      <Plus size={16} /> Book Appointment
                     </Button>
                   </Link>
                 }

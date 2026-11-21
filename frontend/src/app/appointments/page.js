@@ -159,9 +159,9 @@ export default function AppointmentsPage() {
                 title="No Upcoming Appointments"
                 description="You don't have any appointments scheduled right now."
                 action={
-                  <Link href="/book">
-                    <Button variant="primary" className="px-6 text-sm">
-                      Book an Appointment
+                  <Link href="/book" className="w-full sm:w-auto sm:max-w-xs block">
+                    <Button variant="primary" className="w-full sm:w-auto sm:max-w-xs sm:px-8 text-sm gap-1.5">
+                      <Plus size={16} /> Book Appointment
                     </Button>
                   </Link>
                 }
@@ -171,6 +171,13 @@ export default function AppointmentsPage() {
                 icon={Calendar}
                 title="No Past Appointments"
                 description="Your past clinic visits and history will appear here once concluded."
+                action={
+                  <Link href="/book" className="w-full sm:w-auto sm:max-w-xs block">
+                    <Button variant="primary" className="w-full sm:w-auto sm:max-w-xs sm:px-8 text-sm gap-1.5">
+                      <Plus size={16} /> Book Appointment
+                    </Button>
+                  </Link>
+                }
               />
             )}
           </Card>
@@ -254,6 +261,17 @@ export default function AppointmentsPage() {
                 </Card>
               );
             })}
+
+            {/* Centered Book appointment button at bottom of list on Upcoming tab */}
+            {activeTab === 'upcoming' && (
+              <div className="flex justify-center pt-2 pb-1">
+                <Link href="/book" className="w-full sm:w-auto sm:max-w-xs block">
+                  <Button variant="primary" className="w-full sm:w-auto sm:max-w-xs sm:px-8 text-sm gap-1.5">
+                    <Plus size={16} /> Book Appointment
+                  </Button>
+                </Link>
+              </div>
+            )}
           </div>
         )}
       </main>
