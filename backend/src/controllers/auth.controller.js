@@ -100,6 +100,35 @@ const verifyOTP = async (req, res, next) => {
 };
 
 /**
+ * Resend OTP to mother's phone number.
+ * POST /api/auth/resend-otp
+ */
+const resendOTP = async (req, res, next) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) throw new AppError('Phone number is required.', 400, 'BAD_REQUEST');
+
+    const formattedPhone = formatPhone(phone);
+    const mother = await db('mothers').where('phone', formattedPhone).first();
+    if (!mother) throw new AppError('Mother account not found.', 404, 'NOT_FOUND');
+    if (mother.is_verified) throw new AppError('Account is already verified.', 400, 'BAD_REQUEST');
+
+    const otpResult = await smsService.sendOTP(formattedPhone);
+
+    res.json({
+      success: true,
+      message: 'OTP resent successfully.',
+      data: {
+        pinId: otpResult.pinId,
+        demoOtp: otpResult.otp || null,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * Login with phone and password.
  * POST /api/auth/login
  */
@@ -229,4 +258,4 @@ function generateRefreshToken(user) {
   );
 }
 
-module.exports = { register, verifyOTP, login, refreshToken };
+module.exports = { register, verifyOTP, resendOTP, login, refreshToken };

@@ -33,6 +33,14 @@ router.post(
 );
 
 router.post(
+  '/resend-otp',
+  validate([
+    body('phone').notEmpty().withMessage('Phone number is required.'),
+  ]),
+  authController.resendOTP
+);
+
+router.post(
   '/login',
   validate([
     body('phone').notEmpty().withMessage('Phone number is required.'),

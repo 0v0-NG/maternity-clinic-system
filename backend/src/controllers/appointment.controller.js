@@ -12,6 +12,51 @@ const config = require('../config');
 const { AppError } = require('../middleware/errorHandler');
 
 /**
+ * Validate booking type and babies according to clinic rules.
+ * - Antenatal Clinic accepts "mother" only.
+ * - Postnatal Clinic accepts "mother", "baby", or "both".
+ * - Anything else is refused with 400 BOOKING_TYPE_INVALID.
+ * - baby_ids must belong to the mother and are required for "baby" and "both".
+ */
+const validateBookingTypeAndBabies = async (trx, clinic, booking_type, baby_ids, mother_id) => {
+  const type = booking_type || 'mother';
+  if (!['mother', 'baby', 'both'].includes(type)) {
+    throw new AppError('Invalid booking type.', 400, 'BOOKING_TYPE_INVALID');
+  }
+
+  const clinicName = (clinic && clinic.name) ? clinic.name.toLowerCase() : '';
+  const isPostnatal = clinicName.includes('postnatal') || clinicName.includes('pnc');
+  const isAntenatal = clinicName.includes('antenatal') || clinicName.includes('anc');
+
+  if (isAntenatal || !isPostnatal) {
+    if (type !== 'mother') {
+      throw new AppError('Antenatal Clinic accepts booking_type "mother" only.', 400, 'BOOKING_TYPE_INVALID');
+    }
+  } else {
+    if (!['mother', 'baby', 'both'].includes(type)) {
+      throw new AppError('Postnatal Clinic accepts booking_type "mother", "baby", or "both".', 400, 'BOOKING_TYPE_INVALID');
+    }
+  }
+
+  if (['baby', 'both'].includes(type)) {
+    if (!baby_ids || !Array.isArray(baby_ids) || baby_ids.length === 0) {
+      throw new AppError('baby_ids are required when booking for "baby" or "both".', 400, 'BOOKING_TYPE_INVALID');
+    }
+
+    const validBabies = await trx('babies')
+      .whereIn('id', baby_ids)
+      .where('mother_id', mother_id)
+      .select('id');
+
+    if (validBabies.length !== baby_ids.length) {
+      throw new AppError('One or more selected babies do not belong to this mother.', 400, 'BOOKING_TYPE_INVALID');
+    }
+  }
+
+  return type;
+};
+
+/**
  * Book a new appointment.
  * POST /api/appointments
  */
@@ -38,6 +83,12 @@ const bookAppointment = async (req, res, next) => {
 
       if (!slot) throw new AppError('Slot not found.', 404, 'NOT_FOUND');
       if (slot.is_blocked) throw new AppError('This slot is blocked.', 400, 'BAD_REQUEST');
+
+      // 3. Fetch clinic and validate booking type and babies
+      const clinic = await trx('clinics').where('id', clinic_id).first();
+      if (!clinic) throw new AppError('Clinic not found.', 404, 'NOT_FOUND');
+
+      const effectiveBookingType = await validateBookingTypeAndBabies(trx, clinic, booking_type, baby_ids, mother_id);
 
       // Reject mothers attempting to book reserved walk-in slots
       if (slot.is_walkin && req.user.role === 'mother') {
@@ -99,7 +150,7 @@ const bookAppointment = async (req, res, next) => {
           staff_id: slot.staff_id,
           slot_id,
           status: 'booked',
-          booking_type: booking_type || 'mother',
+          booking_type: effectiveBookingType,
           booked_at: new Date(),
           reminder_24h_sent: isLessThan24hAhead,
           reminder_2h_sent: false,
@@ -108,7 +159,7 @@ const bookAppointment = async (req, res, next) => {
       const appointment = await trx('appointments').where('id', appointmentId).first();
 
       // Link babies if booking includes baby
-      if (baby_ids && baby_ids.length > 0 && ['baby', 'both'].includes(booking_type)) {
+      if (baby_ids && baby_ids.length > 0 && ['baby', 'both'].includes(effectiveBookingType)) {
         const babyLinks = baby_ids.map((babyId) => ({
           appointment_id: appointmentId,
           baby_id: babyId,
@@ -314,6 +365,28 @@ const rescheduleAppointment = async (req, res, next) => {
         throw new AppError('This slot is reserved for walk-in patients.', 400, 'SLOT_RESERVED');
       }
 
+      // 3. Fetch target clinic and validate booking type and baby_ids per clinic rules
+      const targetClinic = await trx('clinics').where('id', newSlot.clinic_id).first();
+      if (!targetClinic) throw new AppError('Clinic not found.', 404, 'NOT_FOUND');
+
+      const targetBookingType = req.body.booking_type || appointment.booking_type;
+      let targetBabyIds = req.body.baby_ids;
+
+      if (!targetBabyIds && ['baby', 'both'].includes(targetBookingType)) {
+        const existingBabies = await trx('appointment_babies')
+          .where('appointment_id', appointment.id)
+          .select('baby_id');
+        targetBabyIds = existingBabies.map((b) => b.baby_id);
+      }
+
+      const effectiveType = await validateBookingTypeAndBabies(
+        trx,
+        targetClinic,
+        targetBookingType,
+        targetBabyIds,
+        appointment.mother_id
+      );
+
       // Reject rescheduling into slots that have already passed in Africa/Lagos time
       const newSlotStartTime = parseLagosDateTime(newSlot.slot_date, newSlot.start_time);
       const newSlotEndTime = parseLagosDateTime(newSlot.slot_date, newSlot.end_time);
@@ -356,11 +429,24 @@ const rescheduleAppointment = async (req, res, next) => {
         .where('id', req.params.id)
         .update({
           slot_id: new_slot_id,
+          clinic_id: newSlot.clinic_id,
+          booking_type: effectiveType,
           staff_id: newSlot.staff_id,
           reminder_24h_sent: false,
           reminder_2h_sent: false,
           updated_at: new Date(),
         });
+
+      if (req.body.baby_ids && Array.isArray(req.body.baby_ids)) {
+        await trx('appointment_babies').where('appointment_id', req.params.id).del();
+        if (['baby', 'both'].includes(effectiveType)) {
+          const links = req.body.baby_ids.map((bId) => ({
+            appointment_id: req.params.id,
+            baby_id: bId,
+          }));
+          await trx('appointment_babies').insert(links);
+        }
+      }
     });
 
     // Send confirmation SMS
@@ -551,6 +637,12 @@ const updateStatus = async (req, res, next) => {
 
     if (!allowedStatuses.includes(status)) {
       throw new AppError(`Status must be one of: ${allowedStatuses.join(', ')}`, 400, 'BAD_REQUEST');
+    }
+
+    // Front desk role check: front_desk may only set 'no_show'.
+    // Midwife, doctor, and admin can set waiting, in_consultation, completed, and no_show.
+    if (req.user.role === 'front_desk' && status !== 'no_show') {
+      throw new AppError('Front desk staff can only mark appointments as no-show.', 403, 'FORBIDDEN');
     }
 
     const appointment = await db('appointments')

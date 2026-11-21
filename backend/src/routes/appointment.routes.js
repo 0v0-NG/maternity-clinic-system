@@ -14,9 +14,7 @@ router.post(
   validate([
     body('slot_id').notEmpty().withMessage('Slot ID is required.'),
     body('clinic_id').notEmpty().withMessage('Clinic ID is required.'),
-    body('booking_type')
-      .isIn(['mother', 'baby', 'both'])
-      .withMessage('Booking type must be mother, baby, or both.'),
+    body('booking_type').optional().isString(),
     body('baby_ids').optional().isArray(),
   ]),
   appointmentController.bookAppointment
@@ -31,6 +29,8 @@ router.put(
   '/:id/reschedule',
   validate([
     body('new_slot_id').notEmpty().withMessage('New slot ID is required.'),
+    body('booking_type').optional().isString(),
+    body('baby_ids').optional().isArray(),
   ]),
   appointmentController.rescheduleAppointment
 );
@@ -48,7 +48,7 @@ router.post(
 // Staff: update visit status
 router.put(
   '/:id/status',
-  authorize('midwife', 'doctor', 'admin'),
+  authorize('front_desk', 'midwife', 'doctor', 'admin'),
   validate([
     body('status')
       .isIn(['waiting', 'in_consultation', 'completed', 'no_show'])
@@ -65,9 +65,7 @@ router.post(
     body('mother_id').notEmpty().withMessage('Mother ID is required.'),
     body('clinic_id').notEmpty().withMessage('Clinic ID is required.'),
     body('slot_id').notEmpty().withMessage('Slot ID is required.'),
-    body('booking_type')
-      .isIn(['mother', 'baby', 'both'])
-      .withMessage('Booking type must be mother, baby, or both.'),
+    body('booking_type').optional().isString(),
     body('baby_ids').optional().isArray(),
   ]),
   appointmentController.bookFollowUp

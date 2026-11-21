@@ -147,7 +147,7 @@ async function runSmokeTest() {
       console.log(`[FAIL] Step 4: List Clinics - Status ${clinicsRes.status}`);
       process.exit(1);
     }
-    const clinic = clinicsRes.data.data.find((c) => c.name === 'Antenatal Clinic') || clinicsRes.data.data[0];
+    const clinic = clinicsRes.data.data.find((c) => c.name.toLowerCase().includes('postnatal')) || clinicsRes.data.data[0];
     const today = getLagosToday();
 
     // Check if an available non-walkin slot exists today in the future
@@ -244,11 +244,15 @@ async function runSmokeTest() {
     passedCount++;
 
     // 7. Ownership Check (Second mother gets 403 on reading first mother's appointment)
-    const testPhone2 = `080${Math.floor(10000000 + Math.random() * 90000000)}`;
+    const testPhone2 = `080${Date.now().toString().slice(-6)}${Math.floor(10 + Math.random() * 90)}`;
     const reg2Res = await request('/auth/register', {
       method: 'POST',
       body: { phone: testPhone2, name: 'Smoke Mother Two', password: 'Password123!', consent: true },
     });
+    if (reg2Res.status !== 201 || !reg2Res.data?.data?.motherId) {
+      console.log(`[FAIL] Step 7: Register Mother 2 - Status ${reg2Res.status}: ${JSON.stringify(reg2Res.data)}`);
+      process.exit(1);
+    }
     const { motherId: registeredM2Id, pinId: p2Id, demoOtp: otp2 } = reg2Res.data.data;
     m2Id = registeredM2Id;
     const verify2Res = await request('/auth/verify-otp', {

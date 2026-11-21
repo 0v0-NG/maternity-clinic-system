@@ -247,6 +247,182 @@ const listStaff = async (req, res, next) => {
 };
 
 /**
+ * Generate slots for a clinic over a date range (admin only).
+ * POST /api/admin/slots/generate
+ */
+const generateSlots = async (req, res, next) => {
+  try {
+    const {
+      clinic_id,
+      from_date,
+      to_date,
+      start_time,
+      end_time,
+      weekdays = [1, 2, 3, 4, 5],
+      staff_id = null,
+    } = req.body;
+
+    if (!clinic_id || !from_date || !to_date || !start_time || !end_time) {
+      throw new AppError('clinic_id, from_date, to_date, start_time, and end_time are required.', 400, 'BAD_REQUEST');
+    }
+
+    const clinic = await db('clinics').where('id', clinic_id).first();
+    if (!clinic) throw new AppError('Clinic not found.', 404, 'NOT_FOUND');
+
+    const today = getLagosToday();
+    if (from_date < today) {
+      throw new AppError('Cannot generate slots for past dates.', 400, 'BAD_REQUEST');
+    }
+    if (to_date < from_date) {
+      throw new AppError('to_date must be on or after from_date.', 400, 'BAD_REQUEST');
+    }
+
+    // Check date range <= 31 days
+    const fromDateObj = new Date(from_date + 'T00:00:00Z');
+    const toDateObj = new Date(to_date + 'T00:00:00Z');
+    const diffTime = toDateObj.getTime() - fromDateObj.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+    if (diffDays > 31) {
+      throw new AppError('Date range cannot exceed 31 days.', 400, 'BAD_REQUEST');
+    }
+
+    const parseTimeToMinutes = (t) => {
+      const parts = t.split(':').map((p) => parseInt(p, 10));
+      return parts[0] * 60 + parts[1];
+    };
+
+    const formatMinutesToTime = (min) => {
+      const h = Math.floor(min / 60);
+      const m = min % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
+    };
+
+    const startMin = parseTimeToMinutes(start_time);
+    const endMin = parseTimeToMinutes(end_time);
+    const slotDuration = clinic.slot_duration_min || 20;
+
+    if (startMin >= endMin || (endMin - startMin) < slotDuration) {
+      throw new AppError('start_time must be earlier than end_time by at least one slot duration.', 400, 'BAD_REQUEST');
+    }
+
+    // Template slots for one day
+    const dailySlotTemplates = [];
+    for (let m = startMin; m + slotDuration <= endMin; m += slotDuration) {
+      dailySlotTemplates.push({
+        start_time: formatMinutesToTime(m),
+        end_time: formatMinutesToTime(m + slotDuration),
+      });
+    }
+
+    // Mark about 20% of each day's slots as walk-in (spread throughout the day, e.g. index % 5 === 2)
+    const slotsWithWalkin = dailySlotTemplates.map((slot, index) => ({
+      ...slot,
+      is_walkin: index % 5 === 2,
+    }));
+
+    let createdCount = 0;
+    let skippedCount = 0;
+    const newSlotsToInsert = [];
+
+    const current = new Date(fromDateObj);
+    while (current <= toDateObj) {
+      const dayOfWeek = current.getUTCDay(); // 0 = Sunday, 1 = Monday...
+      const dateStr = current.toISOString().split('T')[0];
+
+      if (weekdays.includes(dayOfWeek)) {
+        const existingSlots = await db('schedule_slots')
+          .where({ clinic_id, slot_date: dateStr })
+          .select('start_time');
+
+        const existingTimes = new Set(
+          existingSlots.map((s) => (s.start_time.length === 5 ? `${s.start_time}:00` : s.start_time))
+        );
+
+        for (const tmpl of slotsWithWalkin) {
+          if (existingTimes.has(tmpl.start_time)) {
+            skippedCount++;
+          } else {
+            createdCount++;
+            newSlotsToInsert.push({
+              id: generateId(),
+              clinic_id,
+              staff_id: staff_id || null,
+              slot_date: dateStr,
+              start_time: tmpl.start_time,
+              end_time: tmpl.end_time,
+              is_walkin: tmpl.is_walkin,
+              is_blocked: false,
+              created_at: new Date(),
+              updated_at: new Date(),
+            });
+          }
+        }
+      }
+
+      current.setUTCDate(current.getUTCDate() + 1);
+    }
+
+    if (newSlotsToInsert.length > 0) {
+      await db.batchInsert('schedule_slots', newSlotsToInsert, 100);
+    }
+
+    // Audit log
+    await db('audit_logs').insert({
+      id: generateId(),
+      user_id: req.user.id,
+      action: 'GENERATE_SLOTS',
+      details: JSON.stringify({
+        clinic_id,
+        from_date,
+        to_date,
+        created: createdCount,
+        skipped: skippedCount,
+      }),
+      created_at: new Date(),
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Slots generated successfully.',
+      data: {
+        clinic_id,
+        from_date,
+        to_date,
+        created: createdCount,
+        skipped: skippedCount,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get system audit logs.
+ * GET /api/admin/audit-logs
+ */
+const getAuditLogs = async (req, res, next) => {
+  try {
+    const { action, user_id, limit = 50, offset = 0 } = req.query;
+
+    let query = db('audit_logs')
+      .select('id', 'user_id', 'action', 'details', 'created_at')
+      .orderBy('created_at', 'desc')
+      .limit(Math.min(parseInt(limit, 10) || 50, 100))
+      .offset(parseInt(offset, 10) || 0);
+
+    if (action) query = query.where('action', action);
+    if (user_id) query = query.where('user_id', user_id);
+
+    const logs = await query;
+    res.json({ success: true, data: logs });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * Create a staff member.
  * POST /api/admin/staff
  */
@@ -258,9 +434,19 @@ const createStaff = async (req, res, next) => {
     const passwordHash = await bcrypt.hash(password, salt);
 
     const id = generateId();
-    const [staff] = await db('staff')
-      .insert({ id, name, role, phone, password_hash: passwordHash, created_at: new Date() })
-      .returning(['id', 'name', 'role', 'phone']);
+    await db('staff').insert({
+      id,
+      name,
+      role,
+      phone,
+      password_hash: passwordHash,
+      created_at: new Date(),
+    });
+
+    const staff = await db('staff')
+      .where('id', id)
+      .select('id', 'name', 'role', 'phone')
+      .first();
 
     // Audit log (never log password)
     await db('audit_logs').insert({
@@ -285,12 +471,17 @@ const updateStaff = async (req, res, next) => {
   try {
     const { name, role, phone } = req.body;
 
-    const [staff] = await db('staff')
-      .where('id', req.params.id)
-      .update({ name, role, phone, updated_at: new Date() })
-      .returning(['id', 'name', 'role', 'phone']);
+    const existing = await db('staff').where('id', req.params.id).first();
+    if (!existing) throw new AppError('Staff member not found.', 404);
 
-    if (!staff) throw new AppError('Staff member not found.', 404);
+    await db('staff')
+      .where('id', req.params.id)
+      .update({ name, role, phone, updated_at: new Date() });
+
+    const staff = await db('staff')
+      .where('id', req.params.id)
+      .select('id', 'name', 'role', 'phone')
+      .first();
 
     res.json({ success: true, message: 'Staff updated.', data: staff });
   } catch (error) {
@@ -302,6 +493,8 @@ module.exports = {
   getAppointmentReport,
   getNoShowReport,
   getClinicLoad,
+  generateSlots,
+  getAuditLogs,
   blockDate,
   unblockDate,
   cancelSession,

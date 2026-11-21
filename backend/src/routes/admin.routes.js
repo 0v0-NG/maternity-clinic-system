@@ -14,6 +14,12 @@ router.get('/reports/appointments', adminController.getAppointmentReport);
 router.get('/reports/no-shows', adminController.getNoShowReport);
 router.get('/reports/clinic-load', adminController.getClinicLoad);
 
+// Slot generation
+router.post('/slots/generate', adminController.generateSlots);
+
+// Audit logs
+router.get('/audit-logs', adminController.getAuditLogs);
+
 // Block dates
 router.post(
   '/block-date',
