@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { BarChart3, Users, CalendarX, AlertTriangle, LogOut, RefreshCw, Plus, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { adminAPI, clinicAPI } from '../../lib/api';
+import { adminAPI, clinicAPI, clearAuthStorage } from '../../lib/api';
 
 export default function AdminDashboardPage() {
   const [user, setUser] = useState(null);
@@ -93,7 +93,7 @@ export default function AdminDashboardPage() {
   };
 
   const handleLogout = () => {
-    localStorage.clear();
+    clearAuthStorage();
     router.push('/login');
   };
 

@@ -783,14 +783,51 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
 
 ---
 
-### 7.7 Verifying Desk-Registered Mother Cannot Log In
-1. Open a new Incognito / Private window or log out and visit `/login`.
-2. Enter the desk-registered phone number: `08055443322`.
-3. Enter any test password: `Password123!`.
+### 7.7 Verifying Login Failure Handling & Dual-Storage Logout
+
+#### Case A: Desk-Registered Account Attempting Login (Account Exists Without Password)
+1. Open `/login` in a browser.
+2. Enter the desk-registered phone number: `08098765432`.
+3. Enter password: `Test12345`.
 4. Click **Log in**:
-   - Request sends `POST /api/auth/login`.
+   - `POST /api/auth/login` sends `{ phone: "08098765432", password: "Test12345" }`.
    - Backend responds with status `401 Unauthorized` (`INVALID_CREDENTIALS`).
-   - The application does not crash, throw an uncaught error, or return 500.
-   - Toast displays mapped error: *"Login failed. Please check your details and try again."*.
-   - Patient cannot log in until she completes full self-registration, but continues to receive hospital reminders and live queue updates.
+   - The 401 response interceptor ignores auth endpoints and passes the error directly to the caller without triggering refresh or full-page navigation.
+   - Toast displays mapped error: *"Invalid phone number or password. Please try again."*.
+   - The phone input field **retains** `08098765432`.
+   - The password field is **cleared**.
+   - The submit button transitions back from `"Logging in..."` to `"Log in"`.
+   - The page **does not reload** and does not navigate away.
+
+#### Case B: Non-Existent Account / Wrong Credentials Attempting Login
+1. On `/login`, enter an unregistered phone number: `08031112233`.
+2. Enter password: `wrong123`.
+3. Click **Log in**:
+   - `POST /api/auth/login` sends `{ phone: "08031112233", password: "wrong123" }`.
+   - Backend responds with status `401 Unauthorized` (`INVALID_CREDENTIALS`), returning an identical response body to Case A to prevent account enumeration.
+   - Toast displays mapped error: *"Invalid phone number or password. Please try again."*.
+   - The phone input field **retains** `08031112233`.
+   - The password field is **cleared**.
+   - The submit button transitions back from `"Logging in..."` to `"Log in"`.
+   - The page **does not reload** and does not navigate away.
+
+#### Case C: Registration & OTP Failure Field Preservation
+1. On `/register`, submit mismatched passwords or invalid data:
+   - Form fields (name, phone, hospital ID, HMO number, consent) are retained.
+   - Only password fields are cleared.
+   - Friendly toast error is shown and no page reload occurs.
+2. At OTP verification step:
+   - Entering an invalid OTP (`000000`) clears only the 6 OTP input boxes and refocuses the first digit.
+   - Phone context is preserved, loading stops, and no navigation occurs.
+
+#### Case D: Dual-Storage Session Cleanup on Logout
+1. Log in with valid credentials (e.g., front desk staff or mother account).
+2. Open DevTools -> **Application** -> Storage:
+   - Observe tokens and user data stored across `sessionStorage` (`token`) and `localStorage` (`refreshToken`, `user`).
+3. Click **Log out** (from Dashboard, Profile, Staff, or Admin view).
+4. Verify:
+   - `sessionStorage`: `token`, `refreshToken`, `user` are all removed (`null`).
+   - `localStorage`: `token`, `refreshToken`, `user` are all removed (`null`).
+   - Browser redirects cleanly to `/login`.
+
 

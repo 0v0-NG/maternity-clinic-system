@@ -3,6 +3,7 @@
 export const errorMessages = {
   VALIDATION_ERROR: 'Please check your entry and try again.',
   UNAUTHORIZED: 'Your session has expired. Please log in again.',
+  INVALID_CREDENTIALS: 'Invalid phone number or password. Please try again.',
   FORBIDDEN: 'You do not have permission to do this.',
   NOT_FOUND: 'The item you are looking for could not be found.',
   CONFLICT: 'A patient with this phone number is already registered. Please search for her instead.',

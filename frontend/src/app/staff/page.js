@@ -23,7 +23,7 @@ import {
   Plus,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { clinicAPI, appointmentAPI, queueAPI } from '../../lib/api';
+import { clinicAPI, appointmentAPI, queueAPI, clearAuthStorage } from '../../lib/api';
 import { getErrorMessage, getErrorCode } from '../../lib/errorMessages';
 import {
   formatDate,
@@ -316,10 +316,7 @@ export default function StaffPortalPage() {
 
   // Logout
   const handleLogout = () => {
-    sessionStorage.removeItem('token');
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('user');
+    clearAuthStorage();
     toast.success('Logged out successfully.');
     router.push('/login');
   };

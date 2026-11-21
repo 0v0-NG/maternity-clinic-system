@@ -97,6 +97,7 @@ export default function RegisterPage() {
       setStep(2);
       startResendTimer();
     } catch (error) {
+      setForm((prev) => ({ ...prev, password: '', confirmPassword: '' }));
       toast.error(getErrorMessage(error, 'Registration failed. Please try again.'));
     } finally {
       setLoading(false);
@@ -174,6 +175,8 @@ export default function RegisterPage() {
       else router.push('/dashboard');
     } catch (error) {
       verifyingRef.current = false;
+      setOtp(Array(OTP_LENGTH).fill(''));
+      document.getElementById('otp-0')?.focus();
       toast.error(getErrorMessage(error, 'Verification failed. Please try again.'));
     } finally {
       setLoading(false);

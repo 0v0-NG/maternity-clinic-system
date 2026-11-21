@@ -30,6 +30,7 @@ export default function LoginPage() {
       else if (['front_desk', 'midwife', 'doctor'].includes(role)) router.push('/staff');
       else router.push('/dashboard');
     } catch (error) {
+      setPassword('');
       toast.error(getErrorMessage(error, 'Login failed. Please check your details and try again.'));
     } finally {
       setLoading(false);

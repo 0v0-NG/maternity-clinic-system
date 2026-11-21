@@ -17,7 +17,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { motherAPI, babyAPI } from '../../lib/api';
+import { motherAPI, babyAPI, clearAuthStorage } from '../../lib/api';
 import { getErrorMessage } from '../../lib/errorMessages';
 import { formatDate, getLagosToday } from '../../lib/dateTime';
 import EmergencyNotice from '../../components/EmergencyNotice';
@@ -257,10 +257,7 @@ export default function ProfilePage() {
 
   // 6. Logout
   const handleLogout = () => {
-    sessionStorage.removeItem('token');
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('user');
+    clearAuthStorage();
     toast.success('Logged out successfully.');
     router.push('/login');
   };

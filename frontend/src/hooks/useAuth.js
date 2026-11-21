@@ -2,7 +2,7 @@
 
 import { useState, useEffect, createContext, useContext } from 'react';
 import { useRouter } from 'next/navigation';
-import { authAPI } from '../lib/api';
+import { authAPI, clearAuthStorage } from '../lib/api';
 
 const AuthContext = createContext(null);
 
@@ -93,10 +93,7 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
-    sessionStorage.removeItem('token');
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('user');
+    clearAuthStorage();
     setUser(null);
     router.push('/login');
   };

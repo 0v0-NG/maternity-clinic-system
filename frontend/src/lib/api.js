@@ -23,12 +23,19 @@ const addRefreshSubscriber = (cb) => {
 };
 
 // Clear all auth storage and send the user to login
-const logoutOnAuthFailure = () => {
+export const clearAuthStorage = () => {
   if (typeof window === 'undefined') return;
   sessionStorage.removeItem('token');
+  sessionStorage.removeItem('refreshToken');
+  sessionStorage.removeItem('user');
   localStorage.removeItem('token');
   localStorage.removeItem('refreshToken');
   localStorage.removeItem('user');
+};
+
+const logoutOnAuthFailure = () => {
+  if (typeof window === 'undefined') return;
+  clearAuthStorage();
   window.location.href = '/login';
 };
 
@@ -51,8 +58,23 @@ api.interceptors.response.use(
   async (error) => {
     const { config } = error;
 
-    // Never retry the refresh-token endpoint itself (avoids a refresh loop).
-    if (config && config.url && config.url.includes('/auth/refresh-token')) {
+    // Never run refresh-and-replay or redirect-to-login logic for auth endpoints
+    // (login, register, verify-otp, resend-otp, refresh-token).
+    // For those, reject the error directly to caller untouched.
+    const url = config?.url || '';
+    const isAuthEndpoint =
+      url.includes('/auth/login') ||
+      url.includes('/auth/register') ||
+      url.includes('/auth/verify-otp') ||
+      url.includes('/auth/resend-otp') ||
+      url.includes('/auth/refresh-token') ||
+      url.endsWith('/login') ||
+      url.endsWith('/register') ||
+      url.endsWith('/verify-otp') ||
+      url.endsWith('/resend-otp') ||
+      url.endsWith('/refresh-token');
+
+    if (isAuthEndpoint) {
       return Promise.reject(error);
     }
 
