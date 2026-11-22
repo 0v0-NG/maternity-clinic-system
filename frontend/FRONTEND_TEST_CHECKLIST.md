@@ -1097,13 +1097,11 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
      - If the URL does not use `https:` or its hostname is not `console.neon.tech`, the safety guard hides the button completely.
 
 2. **Verification on `/admin`**:
-   - **Top Navigation Bar**:
-     - An "Open database" button appears next to the **Log out** button in the header across all admin tabs.
-     - Features the `Database` icon and "Open database" label styled as a secondary outline button.
-     - On narrow mobile viewports, the label collapses cleanly to show only the icon.
+   - **Audit Log Tab Only**:
+     - An "Open database" button appears in the System Audit Log tab, immediately next to the **Refresh** button in the same row.
+     - Matches the Refresh button's size (`h-9 px-3.5 text-xs font-semibold`) and outline button styling with the `Database` icon and "Open database" label.
+     - It does NOT appear in the top navigation bar or on any other admin tab.
      - Hover tooltip displays: *"Opens the Neon console in a new tab (needs your Neon login)"*.
      - Clicking the button opens the configured project console in a new tab (`target="_blank" rel="noopener noreferrer"`).
-   - **System Audit Log Tab**:
-     - A matching plain text "Open database" link appears with the `Database` icon in the action bar above the audit log table.
    - **Safety Fallback Verification**:
-     - If `NEXT_PUBLIC_NEON_CONSOLE_URL` is empty, unset, contains credentials, or points to another domain, neither the top bar button nor the audit log link will render.
+     - If `NEXT_PUBLIC_NEON_CONSOLE_URL` is empty, unset, contains credentials, or points to another domain, the button will not render.
