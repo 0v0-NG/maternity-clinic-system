@@ -24,10 +24,13 @@ import {
   User,
   CalendarPlus,
   Settings,
+  Users,
+  UserPlus,
+  Edit2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { adminAPI, clinicAPI, appointmentAPI, clearAuthStorage } from '../../lib/api';
-import { getErrorMessage } from '../../lib/errorMessages';
+import { getErrorMessage, getErrorCode } from '../../lib/errorMessages';
 import {
   formatDate,
   formatDateTime,
@@ -375,7 +378,7 @@ export default function AdminPortalPage() {
   }, [authChecked]);
 
   useEffect(() => {
-    if (activeTab === 'slots') {
+    if (activeTab === 'slots' || activeTab === 'staff') {
       loadStaffList();
     }
   }, [activeTab, loadStaffList]);
@@ -766,6 +769,213 @@ export default function AdminPortalPage() {
   };
 
   // ==========================================
+  // 8.3 STAFF MANAGEMENT State & Logic
+  // ==========================================
+  const [staffSearch, setStaffSearch] = useState('');
+  const [staffRoleFilter, setStaffRoleFilter] = useState('');
+
+  // Modals & Forms
+  const [showAddStaffModal, setShowAddStaffModal] = useState(false);
+  const [addingStaff, setAddingStaff] = useState(false);
+  const [addStaffError, setAddStaffError] = useState(null);
+  const [addStaffForm, setAddStaffForm] = useState({
+    name: '',
+    role: 'front_desk',
+    phone: '',
+    password: '',
+    confirmPassword: '',
+  });
+
+  const [showEditStaffModal, setShowEditStaffModal] = useState(false);
+  const [updatingStaff, setUpdatingStaff] = useState(false);
+  const [editStaffError, setEditStaffError] = useState(null);
+  const [editingStaffOriginal, setEditingStaffOriginal] = useState(null);
+  const [showRoleChangeConfirm, setShowRoleChangeConfirm] = useState(false);
+  const [editStaffForm, setEditStaffForm] = useState({
+    id: '',
+    name: '',
+    role: '',
+    phone: '',
+    password: '',
+  });
+
+  const filteredStaff = useMemo(() => {
+    return staffList.filter((s) => {
+      const q = staffSearch.trim().toLowerCase();
+      const matchQuery =
+        !q ||
+        (s.name && s.name.toLowerCase().includes(q)) ||
+        (s.phone && s.phone.includes(staffSearch.trim()));
+      const matchRole = !staffRoleFilter || s.role === staffRoleFilter;
+      return matchQuery && matchRole;
+    });
+  }, [staffList, staffSearch, staffRoleFilter]);
+
+  const handleAddStaffSubmit = async (e) => {
+    e.preventDefault();
+    setAddStaffError(null);
+
+    const name = addStaffForm.name.trim();
+    const phone = addStaffForm.phone.trim();
+    const password = addStaffForm.password;
+    const confirmPassword = addStaffForm.confirmPassword;
+
+    if (!name || name.length < 2) {
+      setAddStaffError('Please enter a valid full name.');
+      return;
+    }
+
+    if (!phone || phone.length < 10) {
+      setAddStaffError('Please enter a valid Nigerian phone number (e.g. 08012345678).');
+      return;
+    }
+
+    if (!password || password.length < 6) {
+      setAddStaffError('Password must be at least 6 characters.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setAddStaffError('Passwords do not match.');
+      return;
+    }
+
+    setAddingStaff(true);
+    try {
+      const res = await adminAPI.createStaff({
+        name,
+        role: addStaffForm.role,
+        phone,
+        password,
+      });
+      toast.success(res?.data?.message || 'Staff account created.');
+      setShowAddStaffModal(false);
+      setAddStaffForm({
+        name: '',
+        role: 'front_desk',
+        phone: '',
+        password: '',
+        confirmPassword: '',
+      });
+      loadStaffList();
+    } catch (err) {
+      const errCode = getErrorCode(err);
+      let msg;
+      if (errCode === 'CONFLICT') {
+        msg = 'A staff account with this phone number already exists.';
+      } else {
+        msg = getErrorMessage(err, 'Failed to create staff account.');
+      }
+      setAddStaffError(msg);
+      toast.error(msg);
+    } finally {
+      setAddingStaff(false);
+    }
+  };
+
+  const handleOpenEditModal = (staffMember) => {
+    setEditingStaffOriginal(staffMember);
+    setEditStaffForm({
+      id: staffMember.id,
+      name: staffMember.name || '',
+      role: staffMember.role || 'front_desk',
+      phone: staffMember.phone || '',
+      password: '',
+    });
+    setEditStaffError(null);
+    setShowRoleChangeConfirm(false);
+    setShowEditStaffModal(true);
+  };
+
+  const handleSaveEditStaff = async (confirmedRoleChange = false) => {
+    setEditStaffError(null);
+
+    const name = editStaffForm.name.trim();
+    const phone = editStaffForm.phone.trim();
+    const password = editStaffForm.password.trim();
+
+    if (!name || name.length < 2) {
+      setEditStaffError('Please enter a valid full name.');
+      return;
+    }
+
+    if (!phone || phone.length < 10) {
+      setEditStaffError('Please enter a valid Nigerian phone number.');
+      return;
+    }
+
+    if (password && password.length < 6) {
+      setEditStaffError('Password must be at least 6 characters if provided.');
+      return;
+    }
+
+    // Role change confirmation check
+    if (!confirmedRoleChange && editingStaffOriginal && editStaffForm.role !== editingStaffOriginal.role) {
+      setShowRoleChangeConfirm(true);
+      return;
+    }
+
+    setUpdatingStaff(true);
+    try {
+      const payload = {
+        name,
+        role: editStaffForm.role,
+        phone,
+      };
+      if (password) {
+        payload.password = password;
+      }
+
+      const res = await adminAPI.updateStaff(editStaffForm.id, payload);
+      toast.success(res?.data?.message || 'Staff updated.');
+      setShowRoleChangeConfirm(false);
+      setShowEditStaffModal(false);
+      loadStaffList();
+    } catch (err) {
+      const msg = getErrorMessage(err, 'Failed to update staff account.');
+      setEditStaffError(msg);
+      toast.error(msg);
+    } finally {
+      setUpdatingStaff(false);
+    }
+  };
+
+  const getRoleBadge = (role) => {
+    switch (role) {
+      case 'admin':
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+            Admin
+          </span>
+        );
+      case 'doctor':
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+            Doctor
+          </span>
+        );
+      case 'midwife':
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-50 text-teal-700 border border-teal-200">
+            Midwife
+          </span>
+        );
+      case 'front_desk':
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+            Front Desk
+          </span>
+        );
+      default:
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-50 text-gray-700 border border-gray-200">
+            {role}
+          </span>
+        );
+    }
+  };
+
+  // ==========================================
   // 5. AUDIT LOG State & Logic
   // ==========================================
   const [auditLogs, setAuditLogs] = useState([]);
@@ -963,6 +1173,19 @@ export default function AdminPortalPage() {
             </button>
             <button
               onClick={() => {
+                setActiveTab('staff');
+                setMobileMenuOpen(false);
+              }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-left ${
+                activeTab === 'staff'
+                  ? 'bg-primary-50 text-primary-700'
+                  : 'text-body-muted hover:bg-clinic-50'
+              }`}
+            >
+              <Users size={18} /> Staff
+            </button>
+            <button
+              onClick={() => {
                 setActiveTab('audit_log');
                 setMobileMenuOpen(false);
               }}
@@ -1046,6 +1269,18 @@ export default function AdminPortalPage() {
           >
             <Settings size={18} />
             <span>Clinic settings</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('staff')}
+            className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition-colors text-left ${
+              activeTab === 'staff'
+                ? 'bg-primary-50 text-primary-700 font-bold'
+                : 'text-body-muted hover:bg-clinic-50 hover:text-body'
+            }`}
+          >
+            <Users size={18} />
+            <span>Staff</span>
           </button>
           <button
             type="button"
@@ -2229,6 +2464,507 @@ export default function AdminPortalPage() {
                       </Card>
                     );
                   })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ==================================================== */}
+          {/* TAB 8.3: STAFF MANAGEMENT */}
+          {/* ==================================================== */}
+          {activeTab === 'staff' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-bold text-body">Staff Accounts</h2>
+                  <p className="text-sm text-body-muted">
+                    Manage hospital clinical and administrative personnel access.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2.5">
+                  <Button
+                    variant="outline"
+                    onClick={loadStaffList}
+                    disabled={loadingStaff}
+                    className="h-9 px-3.5 text-xs font-semibold"
+                  >
+                    <RefreshCw size={14} className={`mr-1.5 ${loadingStaff ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setAddStaffForm({
+                        name: '',
+                        role: 'front_desk',
+                        phone: '',
+                        password: '',
+                        confirmPassword: '',
+                      });
+                      setAddStaffError(null);
+                      setShowAddStaffModal(true);
+                    }}
+                    className="h-9 px-3.5 text-xs font-semibold flex items-center gap-1.5"
+                  >
+                    <UserPlus size={15} />
+                    <span>Add staff</span>
+                  </Button>
+                </div>
+              </div>
+
+              {/* Search & Filter Bar */}
+              <Card className="p-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-body mb-1" htmlFor="staff-search">
+                      Search Staff
+                    </label>
+                    <input
+                      id="staff-search"
+                      type="text"
+                      className="input-field text-xs h-9 bg-white"
+                      placeholder="Search by staff name or phone..."
+                      value={staffSearch}
+                      onChange={(e) => setStaffSearch(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-body mb-1" htmlFor="staff-role-filter">
+                      Filter Role
+                    </label>
+                    <select
+                      id="staff-role-filter"
+                      className="input-field text-xs h-9 bg-white"
+                      value={staffRoleFilter}
+                      onChange={(e) => setStaffRoleFilter(e.target.value)}
+                    >
+                      <option value="">All Roles</option>
+                      <option value="admin">Admin</option>
+                      <option value="doctor">Doctor</option>
+                      <option value="midwife">Midwife</option>
+                      <option value="front_desk">Front Desk</option>
+                    </select>
+                  </div>
+                </div>
+              </Card>
+
+              {staffError && (
+                <div className="p-3 bg-red-50 rounded-xl border border-red-200 text-xs text-red-700 flex items-center justify-between">
+                  <span>{staffError}</span>
+                  <button type="button" onClick={loadStaffList} className="font-bold underline text-xs">
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {/* Staff Table */}
+              <Card className="overflow-hidden">
+                {loadingStaff && staffList.length === 0 ? (
+                  <div className="p-6 space-y-3">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <Skeleton key={i} height={42} className="w-full" />
+                    ))}
+                  </div>
+                ) : filteredStaff.length === 0 ? (
+                  <div className="p-8">
+                    <EmptyState
+                      icon={Users}
+                      title="No staff members found"
+                      description={
+                        staffSearch || staffRoleFilter
+                          ? 'No staff accounts match your search or filter criteria.'
+                          : 'No staff accounts found in the system.'
+                      }
+                      actionLabel={staffSearch || staffRoleFilter ? 'Clear filters' : undefined}
+                      onAction={
+                        staffSearch || staffRoleFilter
+                          ? () => {
+                              setStaffSearch('');
+                              setStaffRoleFilter('');
+                            }
+                          : undefined
+                      }
+                    />
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="border-b border-border bg-clinic-50/50 font-semibold text-body-muted uppercase tracking-wider text-[11px]">
+                          <th className="py-3 px-4">Name</th>
+                          <th className="py-3 px-4">Role</th>
+                          <th className="py-3 px-4">Phone</th>
+                          <th className="py-3 px-4">Created Date</th>
+                          <th className="py-3 px-4 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {filteredStaff.map((staff) => (
+                          <tr key={staff.id} className="hover:bg-clinic-50/40 transition-colors">
+                            <td className="py-3.5 px-4 font-semibold text-body">
+                              <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-full bg-primary-100 text-primary-800 flex items-center justify-center font-bold text-xs uppercase">
+                                  {staff.name ? staff.name.charAt(0) : 'S'}
+                                </div>
+                                <div>
+                                  <p>{staff.name}</p>
+                                  {currentUser?.id === staff.id && (
+                                    <span className="text-[10px] text-primary-700 font-medium">(You)</span>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4">{getRoleBadge(staff.role)}</td>
+                            <td className="py-3.5 px-4 font-mono text-body-muted">{staff.phone}</td>
+                            <td className="py-3.5 px-4 text-body-muted">
+                              {staff.created_at ? formatDate(staff.created_at) : '—'}
+                            </td>
+                            <td className="py-3.5 px-4 text-right">
+                              <Button
+                                variant="outline"
+                                onClick={() => handleOpenEditModal(staff)}
+                                className="h-7 px-2.5 text-xs font-semibold inline-flex items-center gap-1"
+                              >
+                                <Edit2 size={12} />
+                                <span>Edit</span>
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Card>
+
+              {/* Add Staff Modal */}
+              {showAddStaffModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+                  <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-border overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                    <div className="flex items-center justify-between p-5 border-b border-border bg-clinic-50/50">
+                      <div className="flex items-center gap-2.5">
+                        <UserPlus size={18} className="text-primary-700" />
+                        <h3 className="text-base font-bold text-body">Add New Staff Member</h3>
+                      </div>
+                      <button
+                        onClick={() => setShowAddStaffModal(false)}
+                        className="text-body-muted hover:text-body p-1 rounded-lg"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleAddStaffSubmit} className="p-5 space-y-4">
+                      {addStaffError && (
+                        <div className="p-3 bg-red-50 rounded-xl border border-red-200 text-xs text-red-700 flex items-center gap-2">
+                          <AlertCircle size={15} className="text-status-emergency shrink-0" />
+                          <span>{addStaffError}</span>
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="block text-xs font-semibold text-body mb-1" htmlFor="add-staff-name">
+                          Full Name
+                        </label>
+                        <input
+                          id="add-staff-name"
+                          type="text"
+                          required
+                          placeholder="e.g. Dr. Amina Bello"
+                          className="input-field bg-white text-sm"
+                          value={addStaffForm.name}
+                          onChange={(e) => setAddStaffForm({ ...addStaffForm, name: e.target.value })}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-body mb-1" htmlFor="add-staff-role">
+                          Role
+                        </label>
+                        <select
+                          id="add-staff-role"
+                          required
+                          className="input-field bg-white text-sm"
+                          value={addStaffForm.role}
+                          onChange={(e) => setAddStaffForm({ ...addStaffForm, role: e.target.value })}
+                        >
+                          <option value="front_desk">Front Desk</option>
+                          <option value="midwife">Midwife</option>
+                          <option value="doctor">Doctor</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-body mb-1" htmlFor="add-staff-phone">
+                          Phone Number
+                        </label>
+                        <input
+                          id="add-staff-phone"
+                          type="tel"
+                          required
+                          placeholder="08012345678 or +2348012345678"
+                          className="input-field bg-white text-sm"
+                          value={addStaffForm.phone}
+                          onChange={(e) => setAddStaffForm({ ...addStaffForm, phone: e.target.value })}
+                        />
+                        <p className="text-[11px] text-body-muted mt-1">
+                          Nigerian mobile format (11 digits or +234 international format).
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-body mb-1" htmlFor="add-staff-password">
+                          Password (Min 6 characters)
+                        </label>
+                        <input
+                          id="add-staff-password"
+                          type="password"
+                          required
+                          minLength={6}
+                          placeholder="••••••••"
+                          className="input-field bg-white text-sm"
+                          value={addStaffForm.password}
+                          onChange={(e) => setAddStaffForm({ ...addStaffForm, password: e.target.value })}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-body mb-1" htmlFor="add-staff-confirm-password">
+                          Confirm Password
+                        </label>
+                        <input
+                          id="add-staff-confirm-password"
+                          type="password"
+                          required
+                          minLength={6}
+                          placeholder="••••••••"
+                          className="input-field bg-white text-sm"
+                          value={addStaffForm.confirmPassword}
+                          onChange={(e) => setAddStaffForm({ ...addStaffForm, confirmPassword: e.target.value })}
+                        />
+                      </div>
+
+                      <div className="pt-2 flex items-center justify-end gap-3 border-t border-border">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setShowAddStaffModal(false)}
+                          disabled={addingStaff}
+                          className="h-10 px-4 text-xs font-semibold"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="submit"
+                          disabled={addingStaff}
+                          className="h-10 px-5 text-xs font-semibold"
+                        >
+                          {addingStaff ? (
+                            <span className="flex items-center gap-2">
+                              <RefreshCw size={14} className="animate-spin" />
+                              Adding...
+                            </span>
+                          ) : (
+                            'Add staff'
+                          )}
+                        </Button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* Edit Staff Modal */}
+              {showEditStaffModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+                  <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-border overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                    <div className="flex items-center justify-between p-5 border-b border-border bg-clinic-50/50">
+                      <div className="flex items-center gap-2.5">
+                        <Edit2 size={18} className="text-primary-700" />
+                        <h3 className="text-base font-bold text-body">Edit Staff Member</h3>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setShowEditStaffModal(false);
+                          setShowRoleChangeConfirm(false);
+                        }}
+                        className="text-body-muted hover:text-body p-1 rounded-lg"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleSaveEditStaff(false);
+                      }}
+                      className="p-5 space-y-4"
+                    >
+                      {editStaffError && (
+                        <div className="p-3 bg-red-50 rounded-xl border border-red-200 text-xs text-red-700 flex items-center gap-2">
+                          <AlertCircle size={15} className="text-status-emergency shrink-0" />
+                          <span>{editStaffError}</span>
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="block text-xs font-semibold text-body mb-1" htmlFor="edit-staff-name">
+                          Full Name
+                        </label>
+                        <input
+                          id="edit-staff-name"
+                          type="text"
+                          required
+                          className="input-field bg-white text-sm"
+                          value={editStaffForm.name}
+                          onChange={(e) => setEditStaffForm({ ...editStaffForm, name: e.target.value })}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-body mb-1" htmlFor="edit-staff-role">
+                          Role
+                        </label>
+                        <select
+                          id="edit-staff-role"
+                          required
+                          disabled={currentUser?.id === editStaffForm.id}
+                          className={`input-field text-sm ${
+                            currentUser?.id === editStaffForm.id
+                              ? 'bg-gray-100 text-body-muted cursor-not-allowed'
+                              : 'bg-white'
+                          }`}
+                          value={editStaffForm.role}
+                          onChange={(e) => setEditStaffForm({ ...editStaffForm, role: e.target.value })}
+                        >
+                          <option value="front_desk">Front Desk</option>
+                          <option value="midwife">Midwife</option>
+                          <option value="doctor">Doctor</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                        {currentUser?.id === editStaffForm.id && (
+                          <p className="text-[11px] text-amber-700 mt-1 font-medium flex items-center gap-1">
+                            <Lock size={12} /> You cannot change your own admin role.
+                          </p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-body mb-1" htmlFor="edit-staff-phone">
+                          Phone Number
+                        </label>
+                        <input
+                          id="edit-staff-phone"
+                          type="tel"
+                          required
+                          className="input-field bg-white text-sm"
+                          value={editStaffForm.phone}
+                          onChange={(e) => setEditStaffForm({ ...editStaffForm, phone: e.target.value })}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-body mb-1" htmlFor="edit-staff-password">
+                          New Password (Optional, Min 6 characters)
+                        </label>
+                        <input
+                          id="edit-staff-password"
+                          type="password"
+                          minLength={6}
+                          placeholder="Leave blank to keep unchanged"
+                          className="input-field bg-white text-sm"
+                          value={editStaffForm.password}
+                          onChange={(e) => setEditStaffForm({ ...editStaffForm, password: e.target.value })}
+                        />
+                        <p className="text-[11px] text-body-muted mt-1">
+                          Only enter a password if you want to reset this staff member's credentials.
+                        </p>
+                      </div>
+
+                      <div className="pt-2 flex items-center justify-end gap-3 border-t border-border">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setShowEditStaffModal(false);
+                            setShowRoleChangeConfirm(false);
+                          }}
+                          disabled={updatingStaff}
+                          className="h-10 px-4 text-xs font-semibold"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="submit"
+                          disabled={updatingStaff}
+                          className="h-10 px-5 text-xs font-semibold"
+                        >
+                          {updatingStaff ? (
+                            <span className="flex items-center gap-2">
+                              <RefreshCw size={14} className="animate-spin" />
+                              Saving...
+                            </span>
+                          ) : (
+                            'Save'
+                          )}
+                        </Button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* Role Change Confirmation Dialog */}
+              {showRoleChangeConfirm && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                  <div className="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-2xl border border-amber-200">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2.5 rounded-full bg-amber-50 text-amber-700 shrink-0">
+                        <AlertTriangle size={20} />
+                      </div>
+                      <div className="space-y-1">
+                        <h4 className="text-base font-bold text-body">Confirm Role Change</h4>
+                        <p className="text-xs text-body-muted leading-relaxed">
+                          Are you sure you want to change <span className="font-semibold text-body">{editingStaffOriginal?.name}</span>'s role from{' '}
+                          <span className="font-bold text-amber-800 uppercase">{editingStaffOriginal?.role}</span> to{' '}
+                          <span className="font-bold text-primary-800 uppercase">{editStaffForm.role}</span>?
+                        </p>
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-body-muted bg-clinic-50 p-2.5 rounded-xl border border-clinic-100">
+                      This will change their access level and portal permissions immediately.
+                    </p>
+
+                    <div className="flex items-center justify-end gap-2.5 pt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setShowRoleChangeConfirm(false)}
+                        disabled={updatingStaff}
+                        className="h-9 px-3.5 text-xs font-semibold"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => handleSaveEditStaff(true)}
+                        disabled={updatingStaff}
+                        className="h-9 px-4 text-xs font-semibold"
+                      >
+                        {updatingStaff ? (
+                          <span className="flex items-center gap-1.5">
+                            <RefreshCw size={14} className="animate-spin" />
+                            Updating...
+                          </span>
+                        ) : (
+                          'Confirm role change'
+                        )}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

@@ -965,3 +965,116 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
 
 
 
+---
+
+## Step 8: Admin Completion (Slots Generator, Clinic Settings, Staff Accounts)
+
+### 8.1 Slot Generator (`POST /api/admin/slots/generate`)
+> ⚠️ **[DATA-CHANGING TEST]**: Generating slots creates new appointment intervals in the database.
+> **SAFE TEST DATES**: Use safe dates between **26/11/2026** and **28/11/2026** (or next month) to avoid overwriting today's live clinic slots.
+
+1. Click **Slot generator** in the left sidebar (or mobile navigation menu).
+2. **Form Layout & Dynamic Preview**:
+   - Verify clinic selector lists available clinics (e.g. "Antenatal Clinic", "Postnatal Clinic"). Select **Antenatal Clinic**.
+   - Select **From date**: `26/11/2026`.
+   - Select **To date**: `28/11/2026` (3 calendar days).
+   - Set **Start time**: `08:00`, **End time**: `12:00` (4 hours / 240 mins).
+   - Weekdays checkboxes: Notice Monday to Friday are checked by default (0-6 numbering). Check/uncheck individual days and verify state toggles.
+   - Optional Clinician selector: Lists clinicians only (`doctor` and `midwife` roles, excluding admin and front desk). Leave unassigned or select a test clinician.
+   - **Live Preview Line**: Check that the live calculation appears:
+     - Shows calculated slots per active day (e.g. 12 slots/day at 20 mins/slot).
+     - Displays note that ~20% of slots (~2 slots/day) will be reserved for hospital walk-in patients.
+3. **Validation Guards**:
+   - Try selecting a past start date: form blocks submission (*"Cannot generate slots for past dates"*).
+   - Try selecting a date range > 31 days (e.g. 01/01/2027 to 15/02/2027): form blocks submission (*"Date range cannot exceed 31 days"*).
+   - Uncheck all weekdays and submit: form blocks submission (*"Please select at least one weekday"*).
+4. **Confirmation & Generation Execution**:
+   - Return dates to safe test range (`26/11/2026` to `28/11/2026`).
+   - Click **Generate slots**.
+   - Confirmation dialog opens displaying summary: Clinic, Date Range (DD/MM/YYYY), Operating Hours, Weekdays selected, and Clinician.
+   - Click **Confirm and generate**:
+     - Button disables and shows in-flight spinner (*"Generating..."*).
+     - Upon completion, dialog closes and a green Success Summary Card renders:
+       - Displays exact `created` count and `skipped` (existing) count returned by API.
+       - Confirms walk-in slots automatically tagged according to clinic walk-in ratio.
+
+---
+
+### 8.2 Clinic Settings (`PUT /api/clinics/:id`)
+> ⚠️ **[DATA-CHANGING TEST]**: Modifying clinic settings changes default slot durations and walk-in reserves for future slot generation.
+
+1. Click **Clinic settings** in the sidebar.
+2. **View & Informational Notice**:
+   - Prominent note displays: *"Operating Rule Note: Changes to slot length and walk-in share only affect slots generated afterwards; existing slots and appointments are not altered."*
+   - Cards display for each clinical department (e.g., Antenatal Clinic, Postnatal Clinic).
+3. **Editable Fields & Validation**:
+   - Under **Antenatal Clinic**:
+     - Slot Duration: Enter `25` (must be whole minutes between 5 and 120).
+       - Test invalid input: enter `3` or `150` and click **Save** -> validation toast displays error (*"Slot duration must be a whole number between 5 and 120 minutes"*).
+     - Walk-in Share (%): Enter `25` (must be between 0% and 50%).
+       - Test invalid input: enter `60` and click **Save** -> validation toast displays error (*"Walk-in share must be between 0% and 50%"*).
+     - Notice the live preview calculation updates dynamically as numbers change (shows estimated total morning slots and reserved walk-in slots).
+4. **Save Execution**:
+   - Set slot duration to `20` and walk-in share to `20%`.
+   - Click **Save**.
+   - Button shows disabled state with spinner (*"Saving..."*).
+   - Request `PUT /api/clinics/:id` sends payload `{ name, slot_duration_min: 20, walkin_reserve_pct: 0.2 }`.
+   - Success toast displays: *"Clinic settings saved."*
+   - Card updates with new saved values.
+
+---
+
+### 8.3 Staff Accounts (`GET /api/admin/staff`, `POST /api/admin/staff`, `PUT /api/admin/staff/:id`)
+> ⚠️ **[DATA-CHANGING TEST]**: Adding or modifying staff accounts affects login credentials.
+> **TEST ACCOUNTS**: Use throwaway test accounts (e.g., `Test Staff 1`, phone `08099881122`). Do not modify the seeded Admin or Front Desk credentials.
+
+1. Click **Staff** in the sidebar.
+2. **Staff List & Table**:
+   - Verify table loads with columns: **Name**, **Role**, **Phone**, **Created Date**, and **Action**.
+   - Distinct role badges:
+     - Admin: Purple badge.
+     - Doctor: Blue badge.
+     - Midwife: Teal badge.
+     - Front Desk: Amber badge.
+   - Current logged-in user row displays `(You)` badge next to their name.
+   - Test **Search Staff**: type a staff member's name or phone digits -> table filters instantly.
+   - Test **Filter Role**: select "Doctor" -> table shows only doctors; select "All Roles" -> shows all staff.
+3. **Add Staff Account Modal (`POST /api/admin/staff`)**:
+   - Click **Add staff** button in top-right header.
+   - Modal opens with fields: Full Name, Role, Phone Number, Password, Confirm Password.
+   - **Validation checks**:
+     - Leave name empty or password < 6 characters: form prevents submission.
+     - Enter mismatched passwords: error message displays (*"Passwords do not match"*).
+   - **Duplicate Phone Check (409 CONFLICT)**:
+     - Enter seeded admin phone `+2340000000001` with a dummy name and password `TestPass123!`.
+     - Submit: API responds with 409 Conflict.
+     - Modal displays friendly error: *"A staff account with this phone number already exists."*
+   - **Successful Creation**:
+     - Enter Full Name: `Test Midwife Grace`.
+     - Role: Select `Midwife`.
+     - Phone: `08099882233` (throwaway Nigerian phone number).
+     - Password: `Password123!`, Confirm Password: `Password123!`.
+     - Click **Add staff**:
+       - Button shows *"Adding..."* spinner.
+       - Success toast displays: *"Staff account created."*
+       - Modal closes, staff list reloads, and `Test Midwife Grace` appears with Teal Midwife badge.
+4. **Edit Staff Account Modal (`PUT /api/admin/staff/:id`)**:
+   - Locate the newly created `Test Midwife Grace` row. Click **Edit**.
+   - Modal opens with pre-populated name, role, and phone.
+   - Password field is empty with helper note: *"Leave blank to keep unchanged"*.
+   - **Role Change Confirmation**:
+     - Change Role from `Midwife` to `Doctor`.
+     - Click **Save**.
+     - Confirmation dialog opens: *"Are you sure you want to change Test Midwife Grace's role from MIDWIFE to DOCTOR? This will change their access level and portal permissions immediately."*
+     - Click **Confirm role change**:
+       - Button shows *"Updating..."*.
+       - Success toast displays: *"Staff updated."*
+       - Modal closes and row reflects the updated Doctor role (Blue badge).
+   - **Admin Self-Role Protection**:
+     - Find the current admin row (marked with `(You)`). Click **Edit**.
+     - Verify the **Role** dropdown is disabled with lock notice: *"You cannot change your own admin role."*
+     - Admin can still edit their own name, phone, or update their password, but cannot demote or alter their own administrative role.
+   - **No Delete Action**:
+     - Confirm there is NO delete button anywhere on staff rows or edit modals.
+   - **Sensitive Data Security**:
+     - Confirm that password hashes and plain-text passwords are never shown in the table or logged in console/audit.
