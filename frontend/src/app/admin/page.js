@@ -23,6 +23,7 @@ import {
   Clock,
   User,
   CalendarPlus,
+  Settings,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { adminAPI, clinicAPI, appointmentAPI, clearAuthStorage } from '../../lib/api';
@@ -126,26 +127,36 @@ export default function AdminPortalPage() {
     }
   }, [router]);
 
+  const [loadingClinics, setLoadingClinics] = useState(false);
+  const [clinicsError, setClinicsError] = useState(null);
+
   // Load Clinics for selectors
-  useEffect(() => {
+  const loadClinics = useCallback(async () => {
     if (!authChecked) return;
-    async function loadClinics() {
-      try {
-        const res = await clinicAPI.list();
-        const list = res?.data?.data || [];
-        setClinics(list);
-        if (list.length > 0) {
-          setBlockForm((prev) => ({ ...prev, clinic_id: prev.clinic_id || list[0].id }));
-          setUnblockForm((prev) => ({ ...prev, clinic_id: prev.clinic_id || list[0].id }));
-          setCancelForm((prev) => ({ ...prev, clinic_id: prev.clinic_id || list[0].id }));
-          setSlotsForm((prev) => ({ ...prev, clinic_id: prev.clinic_id || list[0].id }));
-        }
-      } catch (err) {
-        toast.error('Failed to load clinic list.');
+    setLoadingClinics(true);
+    setClinicsError(null);
+    try {
+      const res = await clinicAPI.list();
+      const list = res?.data?.data || [];
+      setClinics(list);
+      if (list.length > 0) {
+        setBlockForm((prev) => ({ ...prev, clinic_id: prev.clinic_id || list[0].id }));
+        setUnblockForm((prev) => ({ ...prev, clinic_id: prev.clinic_id || list[0].id }));
+        setCancelForm((prev) => ({ ...prev, clinic_id: prev.clinic_id || list[0].id }));
+        setSlotsForm((prev) => ({ ...prev, clinic_id: prev.clinic_id || list[0].id }));
       }
+    } catch (err) {
+      const msg = getErrorMessage(err, 'Failed to load clinic list.');
+      setClinicsError(msg);
+      toast.error(msg);
+    } finally {
+      setLoadingClinics(false);
     }
-    loadClinics();
   }, [authChecked]);
+
+  useEffect(() => {
+    loadClinics();
+  }, [loadClinics]);
 
   const handleLogout = () => {
     clearAuthStorage();
@@ -676,6 +687,85 @@ export default function AdminPortalPage() {
   };
 
   // ==========================================
+  // 8.2 CLINIC SETTINGS State & Logic
+  // ==========================================
+  const [clinicSettingsForm, setClinicSettingsForm] = useState({});
+  const [savingClinicId, setSavingClinicId] = useState(null);
+  const [clinicSettingsError, setClinicSettingsError] = useState(null);
+
+  // Sync clinic settings form whenever clinics change
+  useEffect(() => {
+    if (Array.isArray(clinics) && clinics.length > 0) {
+      setClinicSettingsForm((prev) => {
+        const next = { ...prev };
+        clinics.forEach((c) => {
+          if (!next[c.id]) {
+            next[c.id] = {
+              name: c.name || '',
+              slot_duration_min: Number(c.slot_duration_min) || 20,
+              walkin_pct: Math.round(Number(c.walkin_reserve_pct ?? 0.2) * 100),
+            };
+          }
+        });
+        return next;
+      });
+    }
+  }, [clinics]);
+
+  const handleClinicSettingChange = (id, field, value) => {
+    setClinicSettingsForm((prev) => ({
+      ...prev,
+      [id]: {
+        ...prev[id],
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleSaveClinicSettings = async (clinicId) => {
+    const data = clinicSettingsForm[clinicId];
+    if (!data) return;
+
+    const duration = parseInt(data.slot_duration_min, 10);
+    const walkinPct = parseFloat(data.walkin_pct);
+
+    if (isNaN(duration) || duration < 5 || duration > 120) {
+      toast.error('Slot duration must be a whole number between 5 and 120 minutes.');
+      return;
+    }
+
+    if (isNaN(walkinPct) || walkinPct < 0 || walkinPct > 50) {
+      toast.error('Walk-in share must be between 0% and 50%.');
+      return;
+    }
+
+    setSavingClinicId(clinicId);
+    setClinicSettingsError(null);
+
+    try {
+      const payload = {
+        name: data.name,
+        slot_duration_min: duration,
+        walkin_reserve_pct: Number((walkinPct / 100).toFixed(2)),
+      };
+      const res = await clinicAPI.update(clinicId, payload);
+      const updated = res?.data?.data;
+      if (updated) {
+        setClinics((prev) =>
+          prev.map((c) => (c.id === clinicId ? { ...c, ...updated } : c))
+        );
+      }
+      toast.success(res?.data?.message || 'Clinic settings saved.');
+    } catch (err) {
+      const msg = getErrorMessage(err, 'Failed to update clinic settings.');
+      setClinicSettingsError(msg);
+      toast.error(msg);
+    } finally {
+      setSavingClinicId(null);
+    }
+  };
+
+  // ==========================================
   // 5. AUDIT LOG State & Logic
   // ==========================================
   const [auditLogs, setAuditLogs] = useState([]);
@@ -860,6 +950,19 @@ export default function AdminPortalPage() {
             </button>
             <button
               onClick={() => {
+                setActiveTab('clinics');
+                setMobileMenuOpen(false);
+              }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-left ${
+                activeTab === 'clinics'
+                  ? 'bg-primary-50 text-primary-700'
+                  : 'text-body-muted hover:bg-clinic-50'
+              }`}
+            >
+              <Settings size={18} /> Clinic settings
+            </button>
+            <button
+              onClick={() => {
                 setActiveTab('audit_log');
                 setMobileMenuOpen(false);
               }}
@@ -931,6 +1034,18 @@ export default function AdminPortalPage() {
           >
             <AlertTriangle size={18} />
             <span>Cancel session</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('clinics')}
+            className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition-colors text-left ${
+              activeTab === 'clinics'
+                ? 'bg-primary-50 text-primary-700 font-bold'
+                : 'text-body-muted hover:bg-clinic-50 hover:text-body'
+            }`}
+          >
+            <Settings size={18} />
+            <span>Clinic settings</span>
           </button>
           <button
             type="button"
@@ -1917,6 +2032,205 @@ export default function AdminPortalPage() {
                   </Button>
                 </form>
               </Card>
+            </div>
+          )}
+
+          {/* ==================================================== */}
+          {/* TAB 8.2: CLINIC SETTINGS */}
+          {/* ==================================================== */}
+          {activeTab === 'clinics' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-bold text-body">Clinic Settings</h2>
+                  <p className="text-sm text-body-muted">
+                    Configure slot duration and walk-in capacity reservations per clinic.
+                  </p>
+                </div>
+
+                <Button
+                  variant="outline"
+                  onClick={loadClinics}
+                  disabled={loadingClinics}
+                  className="h-9 px-3.5 text-xs font-semibold self-start sm:self-auto"
+                >
+                  <RefreshCw size={14} className={`mr-1.5 ${loadingClinics ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </div>
+
+              {/* Informational Banner */}
+              <div className="p-4 bg-primary-50 rounded-2xl border border-primary-100 flex items-start gap-3">
+                <Info size={18} className="text-primary-700 shrink-0 mt-0.5" />
+                <div className="text-xs text-primary-900 space-y-1">
+                  <p className="font-semibold text-sm text-primary-950">Operating Rule Note</p>
+                  <p>
+                    Changes to slot length and walk-in share only affect slots generated afterwards; existing slots and appointments are not altered.
+                  </p>
+                </div>
+              </div>
+
+              {clinicSettingsError && (
+                <div className="p-3 bg-red-50 rounded-xl border border-red-200 text-xs text-red-700 flex items-center justify-between">
+                  <span>{clinicSettingsError}</span>
+                  <button
+                    type="button"
+                    onClick={loadClinics}
+                    className="font-bold underline text-xs"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {loadingClinics && clinics.length === 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Skeleton height={260} className="w-full rounded-2xl" />
+                  <Skeleton height={260} className="w-full rounded-2xl" />
+                </div>
+              ) : clinics.length === 0 ? (
+                <EmptyState
+                  icon={Settings}
+                  title="No clinics found"
+                  description="No clinical departments were returned by the server."
+                  actionLabel="Reload clinics"
+                  onAction={loadClinics}
+                />
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {clinics.map((clinic) => {
+                    const formState = clinicSettingsForm[clinic.id] || {
+                      name: clinic.name || '',
+                      slot_duration_min: clinic.slot_duration_min || 20,
+                      walkin_pct: Math.round(Number(clinic.walkin_reserve_pct ?? 0.2) * 100),
+                    };
+                    const isSaving = savingClinicId === clinic.id;
+                    const durationNum = parseInt(formState.slot_duration_min, 10) || 20;
+                    const walkinNum = parseFloat(formState.walkin_pct) || 0;
+                    const estTotalMorningSlots = Math.floor(240 / (durationNum > 0 ? durationNum : 20));
+                    const estWalkinSlots = Math.round(estTotalMorningSlots * (walkinNum / 100));
+
+                    return (
+                      <Card key={clinic.id} className="p-6 flex flex-col justify-between space-y-6">
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between pb-3 border-b border-border">
+                            <div>
+                              <h3 className="text-base font-bold text-body">{clinic.name}</h3>
+                              <p className="text-[11px] text-body-muted font-mono">{clinic.id}</p>
+                            </div>
+                            <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-clinic-50 text-clinic-700 border border-clinic-200">
+                              Active Clinic
+                            </span>
+                          </div>
+
+                          <div className="space-y-3">
+                            <div>
+                              <label
+                                className="block text-xs font-semibold text-body mb-1"
+                                htmlFor={`clinic-name-${clinic.id}`}
+                              >
+                                Clinic Name
+                              </label>
+                              <input
+                                id={`clinic-name-${clinic.id}`}
+                                type="text"
+                                className="input-field bg-white text-sm"
+                                value={formState.name}
+                                onChange={(e) => handleClinicSettingChange(clinic.id, 'name', e.target.value)}
+                                placeholder="Clinic Name"
+                                required
+                              />
+                            </div>
+
+                            <div>
+                              <label
+                                className="block text-xs font-semibold text-body mb-1"
+                                htmlFor={`slot-duration-${clinic.id}`}
+                              >
+                                Slot Duration (Minutes, 5 to 120)
+                              </label>
+                              <div className="relative">
+                                <Clock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-body-muted" />
+                                <input
+                                  id={`slot-duration-${clinic.id}`}
+                                  type="number"
+                                  min="5"
+                                  max="120"
+                                  step="1"
+                                  className="input-field bg-white text-sm pl-9"
+                                  value={formState.slot_duration_min}
+                                  onChange={(e) =>
+                                    handleClinicSettingChange(clinic.id, 'slot_duration_min', e.target.value)
+                                  }
+                                  required
+                                />
+                              </div>
+                              <p className="text-[11px] text-body-muted mt-1">
+                                Whole minutes each appointment slot will span (e.g. 20 for ANC, 30 for PNC).
+                              </p>
+                            </div>
+
+                            <div>
+                              <label
+                                className="block text-xs font-semibold text-body mb-1"
+                                htmlFor={`walkin-pct-${clinic.id}`}
+                              >
+                                Walk-in Share (Percentage, 0% to 50%)
+                              </label>
+                              <div className="relative">
+                                <Percent size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-body-muted" />
+                                <input
+                                  id={`walkin-pct-${clinic.id}`}
+                                  type="number"
+                                  min="0"
+                                  max="50"
+                                  step="1"
+                                  className="input-field bg-white text-sm pl-9"
+                                  value={formState.walkin_pct}
+                                  onChange={(e) =>
+                                    handleClinicSettingChange(clinic.id, 'walkin_pct', e.target.value)
+                                  }
+                                  required
+                                />
+                              </div>
+                              <p className="text-[11px] text-body-muted mt-1">
+                                Portion of newly generated slots held for emergency or desk walk-in patients (max 50%).
+                              </p>
+                            </div>
+
+                            {/* Live calculation preview */}
+                            <div className="p-3 bg-clinic-50/60 rounded-xl border border-clinic-100 text-xs text-body-muted space-y-1">
+                              <p className="font-semibold text-body text-[11px]">Generation Preview (4-hour session)</p>
+                              <p>
+                                ~{estTotalMorningSlots} slots generated per day: ~{estTotalMorningSlots - estWalkinSlots} online /
+                                ~{estWalkinSlots} walk-in reserve ({walkinNum}%).
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="pt-4 border-t border-border flex justify-end">
+                          <Button
+                            type="button"
+                            onClick={() => handleSaveClinicSettings(clinic.id)}
+                            disabled={isSaving}
+                            className="w-full sm:w-auto px-5 h-10 text-sm font-semibold"
+                          >
+                            {isSaving ? (
+                              <span className="flex items-center gap-2">
+                                <RefreshCw size={14} className="animate-spin" />
+                                Saving...
+                              </span>
+                            ) : (
+                              'Save'
+                            )}
+                          </Button>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
