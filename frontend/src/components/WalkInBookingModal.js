@@ -349,6 +349,16 @@ export default function WalkInBookingModal({
   // Step 5: Check in now
   const handleCheckInNow = async () => {
     if (!createdAppointment || isCheckingIn) return;
+    const bookingDate =
+      selectedSlot?.slot_date ||
+      selectedSlot?.date ||
+      createdAppointment?.slot_date ||
+      createdAppointment?.date;
+    const todayStr = getLagosToday();
+    if (bookingDate && bookingDate !== todayStr) {
+      toast.error('Check-in is only allowed on the day of your appointment.');
+      return;
+    }
     setIsCheckingIn(true);
     try {
       const res = await appointmentAPI.checkIn(createdAppointment.id);
@@ -1078,63 +1088,79 @@ export default function WalkInBookingModal({
           {/* ============================================================= */}
           {/* STEP 5: SUCCESS & IMMEDIATE CHECK-IN                          */}
           {/* ============================================================= */}
-          {step === 5 && (
-            <div className="text-center py-4 space-y-4">
-              <div className="w-14 h-14 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
-                <CheckCircle2 size={32} />
-              </div>
+          {step === 5 && (() => {
+            const bookingDate =
+              selectedSlot?.slot_date ||
+              selectedSlot?.date ||
+              createdAppointment?.slot_date ||
+              createdAppointment?.date;
+            const todayStr = getLagosToday();
+            const isBookingToday = Boolean(bookingDate && bookingDate === todayStr);
 
-              <div>
-                <h3 className="text-base font-bold text-body">
-                  Booking Confirmed!
-                </h3>
-                <p className="text-xs text-body-muted mt-1">
-                  Appointment created for{' '}
-                  <strong className="text-body">{selectedMother?.name}</strong> at{' '}
-                  <strong className="text-body">{selectedClinic?.name}</strong>.
-                </p>
-              </div>
+            return (
+              <div className="text-center py-4 space-y-4">
+                <div className="w-14 h-14 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                  <CheckCircle2 size={32} />
+                </div>
 
-              {/* Ticket Banner if checked in */}
-              {checkInTicket && (
-                <div className="p-4 bg-primary-50 border-2 border-primary-500 rounded-2xl max-w-sm mx-auto shadow-sm">
-                  <span className="text-[11px] font-bold text-primary-700 uppercase tracking-wider block mb-1">
-                    Queue Ticket Issued
-                  </span>
-                  <span className="text-2xl font-black font-mono text-primary-800">
-                    {checkInTicket}
-                  </span>
-                  <p className="text-[11px] text-body-muted mt-1">
-                    Patient has been added to today&apos;s active clinic waiting queue.
+                <div>
+                  <h3 className="text-base font-bold text-body">
+                    Booking Confirmed!
+                  </h3>
+                  <p className="text-xs text-body-muted mt-1">
+                    Appointment created for{' '}
+                    <strong className="text-body">{selectedMother?.name}</strong> at{' '}
+                    <strong className="text-body">{selectedClinic?.name}</strong>.
                   </p>
                 </div>
-              )}
 
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-3">
-                {!checkInTicket && (
+                {/* Ticket Banner if checked in */}
+                {checkInTicket && (
+                  <div className="p-4 bg-primary-50 border-2 border-primary-500 rounded-2xl max-w-sm mx-auto shadow-sm">
+                    <span className="text-[11px] font-bold text-primary-700 uppercase tracking-wider block mb-1">
+                      Queue Ticket Issued
+                    </span>
+                    <span className="text-2xl font-black font-mono text-primary-800">
+                      {checkInTicket}
+                    </span>
+                    <p className="text-[11px] text-body-muted mt-1">
+                      Patient has been added to today&apos;s active clinic waiting queue.
+                    </p>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-3">
+                  {!checkInTicket && (
+                    isBookingToday ? (
+                      <Button
+                        type="button"
+                        variant="primary"
+                        disabled={isCheckingIn}
+                        onClick={handleCheckInNow}
+                        className="w-full sm:w-auto text-xs h-10 px-6 font-bold gap-1.5 shadow-sm"
+                      >
+                        <CheckCircle2 size={16} />
+                        {isCheckingIn ? 'Checking in...' : 'Check in now'}
+                      </Button>
+                    ) : (
+                      <div className="p-3 bg-clinic-50 border border-border rounded-xl text-xs text-body font-medium">
+                        Booked for {formatDate(bookingDate)}. Check in on the day.
+                      </div>
+                    )
+                  )}
                   <Button
                     type="button"
-                    variant="primary"
-                    disabled={isCheckingIn}
-                    onClick={handleCheckInNow}
-                    className="w-full sm:w-auto text-xs h-10 px-6 font-bold gap-1.5 shadow-sm"
+                    variant={checkInTicket || !isBookingToday ? 'primary' : 'outline'}
+                    onClick={handleFinishAndClose}
+                    className="w-full sm:w-auto text-xs h-10 px-6 font-bold"
                   >
-                    <CheckCircle2 size={16} />
-                    {isCheckingIn ? 'Checking in...' : 'Check in now'}
+                    Back to list
                   </Button>
-                )}
-                <Button
-                  type="button"
-                  variant={checkInTicket ? 'primary' : 'outline'}
-                  onClick={handleFinishAndClose}
-                  className="w-full sm:w-auto text-xs h-10 px-6 font-bold"
-                >
-                  Back to list
-                </Button>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       </div>
     </div>

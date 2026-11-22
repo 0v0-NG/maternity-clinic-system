@@ -210,6 +210,12 @@ export default function StaffPortalPage() {
   // 5. Actions: Check-in
   const handleCheckIn = async (appt) => {
     if (actionInProgress) return;
+    const todayStr = getLagosToday();
+    const apptDate = appt.slot_date || selectedDate;
+    if (apptDate !== todayStr) {
+      toast.error('Check-in is only allowed on the day of your appointment.');
+      return;
+    }
     setActionInProgress(appt.id);
     try {
       const res = await appointmentAPI.checkIn(appt.id);
@@ -229,6 +235,12 @@ export default function StaffPortalPage() {
   // 6. Actions: No-show
   const handleConfirmNoShow = async () => {
     if (!noShowAppt || isMarkingNoShow) return;
+    const todayStr = getLagosToday();
+    const apptDate = noShowAppt.slot_date || selectedDate;
+    if (apptDate > todayStr) {
+      toast.error('You cannot mark future appointments as no-show.');
+      return;
+    }
     setIsMarkingNoShow(true);
     try {
       await appointmentAPI.updateStatus(noShowAppt.id, { status: 'no_show' });
@@ -679,6 +691,11 @@ export default function StaffPortalPage() {
                     {filteredAppointments.map((appt) => {
                       const isProcessing = actionInProgress === appt.id;
                       const isBooked = appt.status === 'booked';
+                      const todayStr = getLagosToday();
+                      const apptDate = appt.slot_date || selectedDate;
+                      const isToday = apptDate === todayStr;
+                      const isFuture = apptDate > todayStr;
+                      const isPast = apptDate < todayStr;
 
                       // Patient name
                       const patientName = appt.mother_name || 'Patient';
@@ -732,25 +749,57 @@ export default function StaffPortalPage() {
                             {/* Actions on 'booked' appointments */}
                             {isBooked && (
                               <div className="flex items-center gap-2">
-                                <Button
-                                  type="button"
-                                  variant="primary"
-                                  disabled={isProcessing}
-                                  onClick={() => handleCheckIn(appt)}
-                                  className="h-9 px-4 text-xs font-bold gap-1 shadow-sm"
-                                >
-                                  <CheckCircle2 size={14} />
-                                  {isProcessing ? 'Processing...' : 'Check In'}
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  disabled={isProcessing}
-                                  onClick={() => setNoShowAppt(appt)}
-                                  className="h-9 px-3 text-xs text-status-no-show border-red-200 hover:bg-red-50"
-                                >
-                                  No-show
-                                </Button>
+                                {/* 1. Check In: only enabled when selected date is today. For future dates show disabled with hint. For past dates hide it. */}
+                                {isToday && (
+                                  <Button
+                                    type="button"
+                                    variant="primary"
+                                    disabled={isProcessing}
+                                    onClick={() => handleCheckIn(appt)}
+                                    className="h-9 px-4 text-xs font-bold gap-1 shadow-sm"
+                                  >
+                                    <CheckCircle2 size={14} />
+                                    {isProcessing ? 'Processing...' : 'Check In'}
+                                  </Button>
+                                )}
+                                {isFuture && (
+                                  <div className="flex items-center gap-1.5" title="Available on the day">
+                                    <Button
+                                      type="button"
+                                      variant="primary"
+                                      disabled={true}
+                                      title="Available on the day"
+                                      className="h-9 px-4 text-xs font-bold gap-1 shadow-sm opacity-50 cursor-not-allowed"
+                                    >
+                                      <CheckCircle2 size={14} />
+                                      Check In
+                                    </Button>
+                                    <span className="text-[11px] text-body-muted">Available on the day</span>
+                                  </div>
+                                )}
+
+                                {/* 2. No-show: enabled only for booked appointments on today's date or past dates. Disabled for future dates. */}
+                                {(isToday || isPast) ? (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    disabled={isProcessing}
+                                    onClick={() => setNoShowAppt(appt)}
+                                    className="h-9 px-3 text-xs text-status-no-show border-red-200 hover:bg-red-50"
+                                  >
+                                    No-show
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    disabled={true}
+                                    title="Cannot mark future appointments as no-show"
+                                    className="h-9 px-3 text-xs text-gray-400 border-gray-200 cursor-not-allowed opacity-50"
+                                  >
+                                    No-show
+                                  </Button>
+                                )}
                               </div>
                             )}
                           </div>
