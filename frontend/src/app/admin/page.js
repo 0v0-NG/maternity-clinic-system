@@ -28,6 +28,7 @@ import {
   UserPlus,
   Edit2,
   AlertCircle,
+  Database,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { adminAPI, clinicAPI, appointmentAPI, clearAuthStorage } from '../../lib/api';
@@ -98,12 +99,36 @@ function maskSensitiveDetails(data) {
   return data;
 }
 
+// Helper to safely validate and retrieve the Neon Console URL
+function getSafeNeonConsoleUrl() {
+  const rawUrl = process.env.NEXT_PUBLIC_NEON_CONSOLE_URL;
+  if (!rawUrl || typeof rawUrl !== 'string') return null;
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return null;
+
+  // Reject database connection strings or embedded credentials immediately
+  if (/^postgres(ql)?:\/\//i.test(trimmed)) return null;
+  if (/:\/\/[^@/\s]+:[^@/\s]+@/.test(trimmed) || trimmed.toLowerCase().includes('user:password@')) return null;
+
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === 'https:' && parsed.hostname === 'console.neon.tech') {
+      if (parsed.username || parsed.password) return null;
+      return parsed.toString();
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 export default function AdminPortalPage() {
   const router = useRouter();
 
   // Auth & General State
   const [currentUser, setCurrentUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const neonConsoleUrl = useMemo(() => getSafeNeonConsoleUrl(), []);
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'block_dates' | 'cancel_session' | 'audit_log'
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [clinics, setClinics] = useState([]);
@@ -1093,6 +1118,19 @@ export default function AdminPortalPage() {
                 System Administrator
               </span>
             </div>
+            {neonConsoleUrl && (
+              <a
+                href={neonConsoleUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Opens the Neon console in a new tab (needs your Neon login)"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-body-muted hover:text-primary-700 hover:bg-primary-50 border border-border transition-colors"
+                aria-label="Open database"
+              >
+                <Database size={16} />
+                <span className="hidden sm:inline">Open database</span>
+              </a>
+            )}
             <button
               type="button"
               onClick={handleLogout}
@@ -2985,15 +3023,30 @@ export default function AdminPortalPage() {
                   </p>
                 </div>
 
-                <Button
-                  variant="outline"
-                  onClick={() => loadAuditLogs(0, false)}
-                  disabled={loadingLogs}
-                  className="h-9 px-3.5 text-xs font-semibold self-start sm:self-auto"
-                >
-                  <RefreshCw size={14} className={`mr-1.5 ${loadingLogs ? 'animate-spin' : ''}`} />
-                  Refresh
-                </Button>
+                <div className="flex items-center gap-3 self-start sm:self-auto">
+                  {neonConsoleUrl && (
+                    <a
+                      href={neonConsoleUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Opens the Neon console in a new tab (needs your Neon login)"
+                      className="text-xs font-semibold text-primary-700 hover:text-primary-800 hover:underline inline-flex items-center gap-1.5"
+                    >
+                      <Database size={14} />
+                      <span>Open database</span>
+                    </a>
+                  )}
+
+                  <Button
+                    variant="outline"
+                    onClick={() => loadAuditLogs(0, false)}
+                    disabled={loadingLogs}
+                    className="h-9 px-3.5 text-xs font-semibold"
+                  >
+                    <RefreshCw size={14} className={`mr-1.5 ${loadingLogs ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </Button>
+                </div>
               </div>
 
               {/* Filters Form */}
@@ -3078,6 +3131,22 @@ export default function AdminPortalPage() {
                   >
                     Retry
                   </button>
+                </div>
+              )}
+
+              {/* Plain text link above the audit log table */}
+              {neonConsoleUrl && (
+                <div className="flex justify-end">
+                  <a
+                    href={neonConsoleUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Opens the Neon console in a new tab (needs your Neon login)"
+                    className="text-xs font-semibold text-primary-700 hover:text-primary-800 hover:underline inline-flex items-center gap-1.5"
+                  >
+                    <Database size={14} />
+                    <span>Open database</span>
+                  </a>
                 </div>
               )}
 

@@ -1078,3 +1078,32 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
      - Confirm there is NO delete button anywhere on staff rows or edit modals.
    - **Sensitive Data Security**:
      - Confirm that password hashes and plain-text passwords are never shown in the table or logged in console/audit.
+
+
+---
+
+### 8.4 Neon Console Database Link (`NEXT_PUBLIC_NEON_CONSOLE_URL`)
+> 💡 **ADMIN CONSOLE SHORTCUT**: Quick-access link to the Neon project console for administrators.
+
+1. **Configuration**:
+   - In `frontend/.env.local`, set:
+     ```env
+     NEXT_PUBLIC_NEON_CONSOLE_URL=https://console.neon.tech/app/projects/<your-project-id>
+     ```
+   - **Crucial Requirement**: You **must restart the Next.js development server** (`npm run dev`) after creating or editing `.env.local` for the environment variable to be evaluated.
+   - **Security Rules**:
+     - Never enter a database connection string (`postgres://...` or `postgresql://...`).
+     - Never embed database credentials (`user:password@`).
+     - If the URL does not use `https:` or its hostname is not `console.neon.tech`, the safety guard hides the button completely.
+
+2. **Verification on `/admin`**:
+   - **Top Navigation Bar**:
+     - An "Open database" button appears next to the **Log out** button in the header across all admin tabs.
+     - Features the `Database` icon and "Open database" label styled as a secondary outline button.
+     - On narrow mobile viewports, the label collapses cleanly to show only the icon.
+     - Hover tooltip displays: *"Opens the Neon console in a new tab (needs your Neon login)"*.
+     - Clicking the button opens the configured project console in a new tab (`target="_blank" rel="noopener noreferrer"`).
+   - **System Audit Log Tab**:
+     - A matching plain text "Open database" link appears with the `Database` icon in the action bar above the audit log table.
+   - **Safety Fallback Verification**:
+     - If `NEXT_PUBLIC_NEON_CONSOLE_URL` is empty, unset, contains credentials, or points to another domain, neither the top bar button nor the audit log link will render.
