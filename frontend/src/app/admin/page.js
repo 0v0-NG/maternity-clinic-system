@@ -22,6 +22,7 @@ import {
   Info,
   Clock,
   User,
+  CalendarPlus,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { adminAPI, clinicAPI, appointmentAPI, clearAuthStorage } from '../../lib/api';
@@ -137,6 +138,7 @@ export default function AdminPortalPage() {
           setBlockForm((prev) => ({ ...prev, clinic_id: prev.clinic_id || list[0].id }));
           setUnblockForm((prev) => ({ ...prev, clinic_id: prev.clinic_id || list[0].id }));
           setCancelForm((prev) => ({ ...prev, clinic_id: prev.clinic_id || list[0].id }));
+          setSlotsForm((prev) => ({ ...prev, clinic_id: prev.clinic_id || list[0].id }));
         }
       } catch (err) {
         toast.error('Failed to load clinic list.');
@@ -324,6 +326,171 @@ export default function AdminPortalPage() {
       loadReports();
     }
   }, [activeTab, loadReports]);
+
+  // ==========================================
+  // 8.1 SLOTS (Slot Generator) State & Logic
+  // ==========================================
+  const [slotsForm, setSlotsForm] = useState({
+    clinic_id: '',
+    from_date: lagosToday,
+    to_date: lagosToday,
+    start_time: '08:00',
+    end_time: '12:00',
+    weekdays: [1, 2, 3, 4, 5],
+    staff_id: '',
+  });
+
+  const [staffList, setStaffList] = useState([]);
+  const [loadingStaff, setLoadingStaff] = useState(false);
+  const [staffError, setStaffError] = useState(null);
+
+  const [showSlotsConfirm, setShowSlotsConfirm] = useState(false);
+  const [submittingSlots, setSubmittingSlots] = useState(false);
+  const [slotsSuccessResult, setSlotsSuccessResult] = useState(null);
+  const [slotsFormError, setSlotsFormError] = useState('');
+
+  const loadStaffList = useCallback(async () => {
+    if (!authChecked) return;
+    setLoadingStaff(true);
+    setStaffError(null);
+    try {
+      const res = await adminAPI.listStaff();
+      setStaffList(res?.data?.data || []);
+    } catch (err) {
+      setStaffError(getErrorMessage(err, 'Failed to load staff list.'));
+    } finally {
+      setLoadingStaff(false);
+    }
+  }, [authChecked]);
+
+  useEffect(() => {
+    if (activeTab === 'slots') {
+      loadStaffList();
+    }
+  }, [activeTab, loadStaffList]);
+
+  const clinicians = useMemo(() => {
+    return staffList.filter((s) => ['doctor', 'midwife'].includes(s.role));
+  }, [staffList]);
+
+  const WEEKDAY_OPTIONS = [
+    { value: 1, label: 'Monday', short: 'Mon' },
+    { value: 2, label: 'Tuesday', short: 'Tue' },
+    { value: 3, label: 'Wednesday', short: 'Wed' },
+    { value: 4, label: 'Thursday', short: 'Thu' },
+    { value: 5, label: 'Friday', short: 'Fri' },
+    { value: 6, label: 'Saturday', short: 'Sat' },
+    { value: 0, label: 'Sunday', short: 'Sun' },
+  ];
+
+  const timeToMinutes = (timeStr) => {
+    if (!timeStr) return 0;
+    const [h, m] = timeStr.split(':').map(Number);
+    return (h || 0) * 60 + (m || 0);
+  };
+
+  const calculateDiffDays = (fromStr, toStr) => {
+    if (!fromStr || !toStr) return 0;
+    const f = new Date(fromStr + 'T00:00:00Z');
+    const t = new Date(toStr + 'T00:00:00Z');
+    return Math.round((t - f) / (1000 * 60 * 60 * 24)) + 1;
+  };
+
+  const selectedClinicForSlots = clinics.find((c) => c.id === slotsForm.clinic_id) || clinics[0];
+  const slotDurationMin = selectedClinicForSlots?.slot_duration_min || 20;
+  const startMins = timeToMinutes(slotsForm.start_time);
+  const endMins = timeToMinutes(slotsForm.end_time);
+  const dailySpanMins = Math.max(0, endMins - startMins);
+  const approxSlotsDaily = slotDurationMin > 0 ? Math.floor(dailySpanMins / slotDurationMin) : 0;
+  const approxWalkInDaily = Math.round(approxSlotsDaily * 0.2);
+  const approxRegularDaily = Math.max(0, approxSlotsDaily - approxWalkInDaily);
+  const slotsDateDiff = calculateDiffDays(slotsForm.from_date, slotsForm.to_date);
+
+  const handleWeekdayToggle = (val) => {
+    setSlotsForm((prev) => {
+      const exists = prev.weekdays.includes(val);
+      const next = exists ? prev.weekdays.filter((w) => w !== val) : [...prev.weekdays, val];
+      return { ...prev, weekdays: next.sort((a, b) => a - b) };
+    });
+  };
+
+  const handleOpenSlotsConfirm = (e) => {
+    e.preventDefault();
+    setSlotsFormError('');
+
+    if (!slotsForm.clinic_id) {
+      setSlotsFormError('Please select a clinic.');
+      return;
+    }
+    if (!slotsForm.from_date || !slotsForm.to_date) {
+      setSlotsFormError('Please select both start and end dates.');
+      return;
+    }
+    if (slotsForm.from_date < lagosToday) {
+      setSlotsFormError('Cannot generate slots for past dates. Start date must be today or future.');
+      return;
+    }
+    if (slotsForm.to_date < slotsForm.from_date) {
+      setSlotsFormError('To date must be on or after From date.');
+      return;
+    }
+    if (slotsDateDiff > 31) {
+      setSlotsFormError(`Date range cannot exceed 31 days (currently ${slotsDateDiff} days).`);
+      return;
+    }
+    if (slotsForm.weekdays.length === 0) {
+      setSlotsFormError('Please select at least one weekday.');
+      return;
+    }
+    if (!slotsForm.start_time || !slotsForm.end_time) {
+      setSlotsFormError('Please enter both start time and end time.');
+      return;
+    }
+    if (startMins >= endMins || dailySpanMins < slotDurationMin) {
+      setSlotsFormError(
+        `Start time must be earlier than end time by at least one slot duration (${slotDurationMin} mins).`
+      );
+      return;
+    }
+
+    setShowSlotsConfirm(true);
+  };
+
+  const handleConfirmGenerateSlots = async () => {
+    setSubmittingSlots(true);
+    setSlotsFormError('');
+    try {
+      const payload = {
+        clinic_id: slotsForm.clinic_id,
+        from_date: slotsForm.from_date,
+        to_date: slotsForm.to_date,
+        start_time: slotsForm.start_time,
+        end_time: slotsForm.end_time,
+        weekdays: slotsForm.weekdays,
+      };
+      if (slotsForm.staff_id) {
+        payload.staff_id = slotsForm.staff_id;
+      }
+      const res = await adminAPI.generateSlots(payload);
+      const data = res?.data?.data;
+      setSlotsSuccessResult({
+        message: res?.data?.message || 'Slots generated successfully.',
+        created: data?.created ?? 0,
+        skipped: data?.skipped ?? 0,
+        from_date: slotsForm.from_date,
+        to_date: slotsForm.to_date,
+        clinic_name: selectedClinicForSlots?.name || 'Clinic',
+      });
+      toast.success(res?.data?.message || 'Slots generated successfully.');
+      setShowSlotsConfirm(false);
+    } catch (err) {
+      const errMsg = getErrorMessage(err, 'Failed to generate slots.');
+      setSlotsFormError(errMsg);
+      toast.error(errMsg);
+    } finally {
+      setSubmittingSlots(false);
+    }
+  };
 
   // ==========================================
   // 3. BLOCK DATES State & Logic
@@ -654,6 +821,19 @@ export default function AdminPortalPage() {
             </button>
             <button
               onClick={() => {
+                setActiveTab('slots');
+                setMobileMenuOpen(false);
+              }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-left ${
+                activeTab === 'slots'
+                  ? 'bg-primary-50 text-primary-700'
+                  : 'text-body-muted hover:bg-clinic-50'
+              }`}
+            >
+              <CalendarPlus size={18} /> Slot generator
+            </button>
+            <button
+              onClick={() => {
                 setActiveTab('block_dates');
                 setMobileMenuOpen(false);
               }}
@@ -715,6 +895,18 @@ export default function AdminPortalPage() {
           >
             <BarChart3 size={18} />
             <span>Dashboard</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('slots')}
+            className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition-colors text-left ${
+              activeTab === 'slots'
+                ? 'bg-primary-50 text-primary-700 font-bold'
+                : 'text-body-muted hover:bg-clinic-50 hover:text-body'
+            }`}
+          >
+            <CalendarPlus size={18} />
+            <span>Slot generator</span>
           </button>
           <button
             type="button"
@@ -1142,6 +1334,259 @@ export default function AdminPortalPage() {
                   </div>
                 </>
               )}
+            </div>
+          )}
+
+          {/* ==================================================== */}
+          {/* TAB 8.1: SLOTS (Slot Generator)                      */}
+          {/* ==================================================== */}
+          {activeTab === 'slots' && (
+            <div className="space-y-6 max-w-4xl">
+              <div>
+                <h2 className="text-xl font-bold text-body">Generate Clinic Slots</h2>
+                <p className="text-sm text-body-muted">
+                  Bulk create appointment slots across date ranges. Spreads ~20% walk-in slots evenly across days.
+                </p>
+              </div>
+
+              {/* Success Result Banner */}
+              {slotsSuccessResult && (
+                <Card className="p-5 border-emerald-200 bg-emerald-50 text-emerald-900 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 font-bold text-emerald-800 text-base">
+                      <CheckCircle2 size={20} className="text-emerald-600" />
+                      <span>{slotsSuccessResult.message}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSlotsSuccessResult(null)}
+                      className="text-xs text-emerald-700 hover:text-emerald-900 font-semibold"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                  <p className="text-xs text-emerald-800">
+                    Clinic: <strong>{slotsSuccessResult.clinic_name}</strong> · Range:{' '}
+                    <strong>{formatDate(slotsSuccessResult.from_date)}</strong> –{' '}
+                    <strong>{formatDate(slotsSuccessResult.to_date)}</strong> ·{' '}
+                    <strong>{slotsSuccessResult.created}</strong> slots created ·{' '}
+                    <strong>{slotsSuccessResult.skipped}</strong> slots skipped.
+                  </p>
+                  <p className="text-[11px] text-emerald-700">
+                    Note: Running slot generation again is safe because existing slots and appointments are automatically skipped.
+                  </p>
+                </Card>
+              )}
+
+              {/* Error Alert */}
+              {slotsFormError && (
+                <div className="p-4 bg-red-50 text-red-900 rounded-xl border border-red-200 text-xs flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle size={16} className="text-red-600 flex-shrink-0" />
+                    <span>{slotsFormError}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSlotsFormError('')}
+                    className="font-bold text-xs hover:underline text-red-800"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+
+              {/* Staff Error Alert */}
+              {staffError && (
+                <div className="p-3 bg-amber-50 text-amber-900 rounded-xl border border-amber-200 text-xs flex items-center justify-between">
+                  <span>Failed to load staff list: {staffError}</span>
+                  <button
+                    type="button"
+                    onClick={loadStaffList}
+                    className="font-bold underline text-xs ml-2"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {/* Form Card */}
+              <Card className="p-6 space-y-5">
+                <form onSubmit={handleOpenSlotsConfirm} className="space-y-5">
+                  {/* Clinic Selector */}
+                  <div>
+                    <label className="block text-xs font-semibold text-body mb-1" htmlFor="slots-clinic">
+                      Target Clinic
+                    </label>
+                    <select
+                      id="slots-clinic"
+                      className="input-field text-sm"
+                      value={slotsForm.clinic_id}
+                      onChange={(e) => setSlotsForm({ ...slotsForm, clinic_id: e.target.value })}
+                      required
+                    >
+                      {clinics.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} ({c.slot_duration_min || 20} min slots)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Dates Row */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-body mb-1" htmlFor="slots-from">
+                        From Date (No past dates)
+                      </label>
+                      <input
+                        id="slots-from"
+                        type="date"
+                        min={lagosToday}
+                        className="input-field text-sm"
+                        value={slotsForm.from_date}
+                        onChange={(e) => setSlotsForm({ ...slotsForm, from_date: e.target.value })}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-body mb-1" htmlFor="slots-to">
+                        To Date (Max 31 days range)
+                      </label>
+                      <input
+                        id="slots-to"
+                        type="date"
+                        min={slotsForm.from_date || lagosToday}
+                        className="input-field text-sm"
+                        value={slotsForm.to_date}
+                        onChange={(e) => setSlotsForm({ ...slotsForm, to_date: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Times Row */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-body mb-1" htmlFor="slots-start-time">
+                        Daily Start Time
+                      </label>
+                      <input
+                        id="slots-start-time"
+                        type="time"
+                        className="input-field text-sm"
+                        value={slotsForm.start_time}
+                        onChange={(e) => setSlotsForm({ ...slotsForm, start_time: e.target.value })}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-body mb-1" htmlFor="slots-end-time">
+                        Daily End Time
+                      </label>
+                      <input
+                        id="slots-end-time"
+                        type="time"
+                        className="input-field text-sm"
+                        value={slotsForm.end_time}
+                        onChange={(e) => setSlotsForm({ ...slotsForm, end_time: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Weekdays Checkboxes */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-xs font-semibold text-body">
+                        Active Weekdays (0=Sun, 1=Mon, ..., 6=Sat)
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSlotsForm((prev) => ({ ...prev, weekdays: [1, 2, 3, 4, 5] }))}
+                          className="text-[11px] font-semibold text-primary-700 hover:underline"
+                        >
+                          Mon–Fri
+                        </button>
+                        <span className="text-border">|</span>
+                        <button
+                          type="button"
+                          onClick={() => setSlotsForm((prev) => ({ ...prev, weekdays: [0, 1, 2, 3, 4, 5, 6] }))}
+                          className="text-[11px] font-semibold text-primary-700 hover:underline"
+                        >
+                          All days
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
+                      {WEEKDAY_OPTIONS.map((day) => {
+                        const isChecked = slotsForm.weekdays.includes(day.value);
+                        return (
+                          <label
+                            key={day.value}
+                            className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs cursor-pointer transition-colors ${
+                              isChecked
+                                ? 'bg-primary-50 border-primary-500 text-primary-800 font-bold'
+                                : 'bg-white border-border text-body-muted hover:bg-clinic-50'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => handleWeekdayToggle(day.value)}
+                              className="rounded text-primary-600 focus:ring-primary-500 h-4 w-4"
+                            />
+                            <span>{day.short} ({day.value})</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Optional Staff Selector */}
+                  <div>
+                    <label className="block text-xs font-semibold text-body mb-1" htmlFor="slots-staff">
+                      Assigned Clinician (Optional)
+                    </label>
+                    <select
+                      id="slots-staff"
+                      className="input-field text-sm"
+                      value={slotsForm.staff_id}
+                      onChange={(e) => setSlotsForm({ ...slotsForm, staff_id: e.target.value })}
+                      disabled={loadingStaff}
+                    >
+                      <option value="">None / Unassigned (Clinic Pool)</option>
+                      {clinicians.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} ({s.role === 'doctor' ? 'Doctor' : 'Midwife'}) · {s.phone}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-body-muted mt-1">
+                      Only clinicians (doctors and midwives) from staff records can be assigned to clinic slot schedules.
+                    </p>
+                  </div>
+
+                  {/* Live Preview Line */}
+                  <div className="p-3.5 bg-clinic-50 border border-primary-200 rounded-xl text-xs space-y-1">
+                    <div className="flex items-center gap-1.5 font-bold text-primary-800">
+                      <Clock size={14} className="text-primary-600" />
+                      <span>Generation Preview:</span>
+                    </div>
+                    <p className="text-body leading-relaxed">
+                      <strong>{slotDurationMin}-min slots</strong> ·{' '}
+                      <strong>~{approxSlotsDaily} slots/day</strong> ({approxRegularDaily} standard + ~{approxWalkInDaily} held for walk-ins, ~20% share) across selected weekdays ({slotsDateDiff} day date range).
+                    </p>
+                  </div>
+
+                  <Button type="submit" variant="primary" className="w-full text-sm font-semibold h-11">
+                    Generate slots
+                  </Button>
+                </form>
+              </Card>
             </div>
           )}
 
@@ -1871,6 +2316,69 @@ export default function AdminPortalPage() {
                 className="h-10 px-5 text-xs font-semibold"
               >
                 {submittingCancel ? 'Cancelling...' : 'Cancel session and notify'}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+      {/* ==================================================== */}
+      {/* Confirmation Modal: GENERATE SLOTS                  */}
+      {/* ==================================================== */}
+      {showSlotsConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <Card className="max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center gap-3 text-primary-700">
+              <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center flex-shrink-0">
+                <CalendarPlus size={22} className="text-primary-600" />
+              </div>
+              <h3 className="text-lg font-bold text-body">Confirm Slot Generation</h3>
+            </div>
+
+            <div className="space-y-2 text-sm text-body">
+              <p>
+                You are about to generate slots for{' '}
+                <strong>{selectedClinicForSlots?.name || 'Selected Clinic'}</strong>:
+              </p>
+              <ul className="text-xs space-y-1 bg-clinic-50 p-3 rounded-xl border border-border">
+                <li>
+                  <strong>Date Range:</strong> {formatDate(slotsForm.from_date)} – {formatDate(slotsForm.to_date)} ({slotsDateDiff} days)
+                </li>
+                <li>
+                  <strong>Hours:</strong> {formatTime12(slotsForm.start_time)} – {formatTime12(slotsForm.end_time)}
+                </li>
+                <li>
+                  <strong>Weekdays:</strong>{' '}
+                  {slotsForm.weekdays.map((w) => WEEKDAY_OPTIONS.find((opt) => opt.value === w)?.short).join(', ')}
+                </li>
+                <li>
+                  <strong>Clinician:</strong>{' '}
+                  {clinicians.find((s) => s.id === slotsForm.staff_id)?.name || 'Unassigned (Pool)'}
+                </li>
+              </ul>
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900">
+                <strong>Idempotent & Safe:</strong>
+                <p className="mt-0.5">
+                  Any existing slots on these dates will be preserved and skipped. Approximately 20% of generated slots will be marked as walk-in slots.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowSlotsConfirm(false)}
+                disabled={submittingSlots}
+                className="h-10 px-4 text-xs font-semibold"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleConfirmGenerateSlots}
+                disabled={submittingSlots}
+                className="h-10 px-5 text-xs font-semibold"
+              >
+                {submittingSlots ? 'Generating...' : 'Confirm & generate'}
               </Button>
             </div>
           </Card>

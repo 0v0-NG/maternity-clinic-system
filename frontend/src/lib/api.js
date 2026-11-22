@@ -149,6 +149,7 @@ export const clinicAPI = {
   list: () => api.get('/clinics'),
   get: (id) => api.get(`/clinics/${id}`),
   getSlots: (id, date) => api.get(`/clinics/${id}/slots?date=${date}`),
+  update: (id, data) => api.put(`/clinics/${id}`, data),
 };
 
 // --- Clinic Info ---
@@ -180,6 +181,7 @@ export const adminAPI = {
   getNoShowReport: (params) => api.get('/admin/reports/no-shows', { params }),
   getClinicLoad: (params) => api.get('/admin/reports/clinic-load', { params }),
   getAuditLogs: (params) => api.get('/admin/audit-logs', { params }),
+  generateSlots: (data) => api.post('/admin/slots/generate', data),
   blockDate: (data) => api.post('/admin/block-date', data),
   unblockDate: (clinicId, date) => api.delete(`/admin/block-date/${clinicId}/${date}`),
   cancelSession: (data) => api.post('/admin/cancel-session', data),
