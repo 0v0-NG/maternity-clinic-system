@@ -556,6 +556,162 @@ describe('Security, Walk-in Rules, and Audit Logging', () => {
     });
   });
 
+  describe('A4: Admin Staff Management (POST & PUT /api/admin/staff)', () => {
+    let createdStaffId;
+    const localPhone = '08099881122';
+    const normalizedPhone = '+2348099881122';
+    const initialPassword = 'InitialPass123';
+    const updatedPassword = 'NewSecretPass456';
+
+    it('should create a staff member with a local-format phone and successfully log in with it', async () => {
+      const res = await request(app)
+        .post('/api/admin/staff')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'Test Midwife Grace',
+          role: 'midwife',
+          phone: localPhone,
+          password: initialPassword,
+        });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.phone).toBe(normalizedPhone);
+      expect(res.body.data.role).toBe('midwife');
+      createdStaffId = res.body.data.id;
+
+      // Verify login works with both local format and international format
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({
+          phone: localPhone,
+          password: initialPassword,
+        });
+
+      expect(loginRes.statusCode).toBe(200);
+      expect(loginRes.body.success).toBe(true);
+      expect(loginRes.body.data.user.role).toBe('midwife');
+      expect(loginRes.body.data.user.phone).toBe(normalizedPhone);
+    });
+
+    it('should reject duplicate staff phone in both local and international format', async () => {
+      // Try duplicate with same local format
+      const dupLocalRes = await request(app)
+        .post('/api/admin/staff')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'Another Midwife',
+          role: 'midwife',
+          phone: localPhone,
+          password: 'AnotherPassword123',
+        });
+
+      expect(dupLocalRes.statusCode).toBe(409);
+      expect(dupLocalRes.body.error.code).toBe('CONFLICT');
+
+      // Try duplicate with international format
+      const dupIntlRes = await request(app)
+        .post('/api/admin/staff')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'Yet Another Midwife',
+          role: 'midwife',
+          phone: normalizedPhone,
+          password: 'AnotherPassword123',
+        });
+
+      expect(dupIntlRes.statusCode).toBe(409);
+      expect(dupIntlRes.body.error.code).toBe('CONFLICT');
+    });
+
+    it('should edit name and role, and keep login working with the old password', async () => {
+      const editRes = await request(app)
+        .put(`/api/admin/staff/${createdStaffId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'Senior Front Desk Grace',
+          role: 'front_desk',
+        });
+
+      expect(editRes.statusCode).toBe(200);
+      expect(editRes.body.success).toBe(true);
+      expect(editRes.body.data.name).toBe('Senior Front Desk Grace');
+      expect(editRes.body.data.role).toBe('front_desk');
+
+      // Log in again and verify new role with existing password
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({
+          phone: localPhone,
+          password: initialPassword,
+        });
+
+      expect(loginRes.statusCode).toBe(200);
+      expect(loginRes.body.success).toBe(true);
+      expect(loginRes.body.data.user.role).toBe('front_desk');
+    });
+
+    it('should keep old password when editing with no password or empty password', async () => {
+      // Edit with empty password string
+      const editRes = await request(app)
+        .put(`/api/admin/staff/${createdStaffId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'Senior Front Desk Grace Updated',
+          password: '',
+        });
+
+      expect(editRes.statusCode).toBe(200);
+      expect(editRes.body.success).toBe(true);
+
+      // Verify old password still works
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({
+          phone: normalizedPhone,
+          password: initialPassword,
+        });
+
+      expect(loginRes.statusCode).toBe(200);
+      expect(loginRes.body.success).toBe(true);
+    });
+
+    it('should change the password through edit, and login only with the new password', async () => {
+      const editPassRes = await request(app)
+        .put(`/api/admin/staff/${createdStaffId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          password: updatedPassword,
+        });
+
+      expect(editPassRes.statusCode).toBe(200);
+      expect(editPassRes.body.success).toBe(true);
+
+      // Old password must now fail
+      const oldLoginRes = await request(app)
+        .post('/api/auth/login')
+        .send({
+          phone: localPhone,
+          password: initialPassword,
+        });
+
+      expect(oldLoginRes.statusCode).toBe(401);
+      expect(oldLoginRes.body.error.code).toBe('INVALID_CREDENTIALS');
+
+      // New password must succeed
+      const newLoginRes = await request(app)
+        .post('/api/auth/login')
+        .send({
+          phone: localPhone,
+          password: updatedPassword,
+        });
+
+      expect(newLoginRes.statusCode).toBe(200);
+      expect(newLoginRes.body.success).toBe(true);
+      expect(newLoginRes.body.data.user.role).toBe('front_desk');
+    });
+  });
+
   afterAll(async () => {
     await db.destroy();
   });

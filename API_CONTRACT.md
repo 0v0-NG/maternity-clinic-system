@@ -1097,7 +1097,7 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
 - **Body**:
   - `name` (string, required)
   - `role` (string, required): One of `"front_desk"`, `"midwife"`, `"doctor"`, `"admin"`
-  - `phone` (string, required)
+  - `phone` (string, required): Automatically normalised to `+234...` format. Duplicate phone checks compare normalised values (`409 CONFLICT`).
   - `password` (string, required): Minimum 6 characters
 - **Success Response (201 Created)**:
 ```json
@@ -1119,8 +1119,8 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
 - **Body**:
   - `name` (string, optional)
   - `role` (string, optional): One of `"front_desk"`, `"midwife"`, `"doctor"`, `"admin"`
-  - `phone` (string, optional)
-  - `password` (string, optional): Minimum 6 characters
+  - `phone` (string, optional): Automatically normalised to `+234...` format. Checked against other staff accounts (`409 CONFLICT`).
+  - `password` (string, optional): Minimum 6 characters. If omitted or empty, the password is not changed.
 - **Success Response (200 OK)**:
 ```json
 {

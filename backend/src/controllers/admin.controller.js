@@ -1,6 +1,6 @@
 const db = require('../config/database');
 const bcrypt = require('bcryptjs');
-const { generateId, getLagosToday } = require('../utils/helpers');
+const { generateId, getLagosToday, formatPhone } = require('../utils/helpers');
 const smsService = require('../services/sms.service');
 const { AppError } = require('../middleware/errorHandler');
 
@@ -430,22 +430,39 @@ const createStaff = async (req, res, next) => {
   try {
     const { name, role, phone, password } = req.body;
 
+    if (!phone || typeof phone !== 'string' || phone.trim().length === 0) {
+      throw new AppError('Phone number is required.', 400, 'VALIDATION_ERROR');
+    }
+
+    const formattedPhone = formatPhone(phone.trim());
+
+    // Check duplicate phone comparing normalized values
+    const existing = await db('staff').where('phone', formattedPhone).first();
+    if (existing) {
+      throw new AppError('A staff member with this phone number already exists.', 409, 'CONFLICT');
+    }
+
+    if (!password || typeof password !== 'string' || password.length < 6) {
+      throw new AppError('Password must be at least 6 characters.', 400, 'VALIDATION_ERROR');
+    }
+
     const salt = await bcrypt.genSalt(12);
     const passwordHash = await bcrypt.hash(password, salt);
 
     const id = generateId();
+    const now = new Date();
     await db('staff').insert({
       id,
-      name,
+      name: name ? name.trim() : '',
       role,
-      phone,
+      phone: formattedPhone,
       password_hash: passwordHash,
-      created_at: new Date(),
+      created_at: now,
     });
 
     const staff = await db('staff')
       .where('id', id)
-      .select('id', 'name', 'role', 'phone')
+      .select('id', 'name', 'role', 'phone', 'created_at')
       .first();
 
     // Audit log (never log password)
@@ -453,8 +470,8 @@ const createStaff = async (req, res, next) => {
       id: generateId(),
       user_id: req.user.id,
       action: 'CREATE_STAFF',
-      details: JSON.stringify({ staffId: id, name, role, phone }),
-      created_at: new Date(),
+      details: JSON.stringify({ staffId: id, name: staff.name, role, phone: formattedPhone }),
+      created_at: now,
     });
 
     res.status(201).json({ success: true, message: 'Staff member created.', data: staff });
@@ -469,19 +486,79 @@ const createStaff = async (req, res, next) => {
  */
 const updateStaff = async (req, res, next) => {
   try {
-    const { name, role, phone } = req.body;
+    const { name, role, phone, password } = req.body;
 
     const existing = await db('staff').where('id', req.params.id).first();
-    if (!existing) throw new AppError('Staff member not found.', 404);
+    if (!existing) throw new AppError('Staff member not found.', 404, 'NOT_FOUND');
+
+    const updateData = { updated_at: new Date() };
+
+    if (name !== undefined) {
+      if (typeof name !== 'string' || name.trim().length === 0) {
+        throw new AppError('Name cannot be empty.', 400, 'VALIDATION_ERROR');
+      }
+      updateData.name = name.trim();
+    }
+
+    if (role !== undefined) {
+      const validRoles = ['front_desk', 'midwife', 'doctor', 'admin'];
+      if (!validRoles.includes(role)) {
+        throw new AppError('Invalid role specified.', 400, 'VALIDATION_ERROR');
+      }
+      updateData.role = role;
+    }
+
+    if (phone !== undefined) {
+      if (typeof phone !== 'string' || phone.trim().length === 0) {
+        throw new AppError('Phone cannot be empty.', 400, 'VALIDATION_ERROR');
+      }
+      const formattedPhone = formatPhone(phone.trim());
+      const duplicate = await db('staff')
+        .where('phone', formattedPhone)
+        .whereNot('id', req.params.id)
+        .first();
+      if (duplicate) {
+        throw new AppError('A staff member with this phone number already exists.', 409, 'CONFLICT');
+      }
+      updateData.phone = formattedPhone;
+    }
+
+    // Password handling:
+    // Only change password if non-empty string sent (enforce minimum length 6).
+    // Never hash or overwrite an empty or undefined value.
+    if (password !== undefined && password !== null) {
+      if (typeof password === 'string' && password.trim().length > 0) {
+        if (password.length < 6) {
+          throw new AppError('Password must be at least 6 characters.', 400, 'VALIDATION_ERROR');
+        }
+        const salt = await bcrypt.genSalt(12);
+        updateData.password_hash = await bcrypt.hash(password, salt);
+      }
+    }
 
     await db('staff')
       .where('id', req.params.id)
-      .update({ name, role, phone, updated_at: new Date() });
+      .update(updateData);
 
     const staff = await db('staff')
       .where('id', req.params.id)
-      .select('id', 'name', 'role', 'phone')
+      .select('id', 'name', 'role', 'phone', 'created_at')
       .first();
+
+    // Audit log (never log password)
+    await db('audit_logs').insert({
+      id: generateId(),
+      user_id: req.user.id,
+      action: 'UPDATE_STAFF',
+      details: JSON.stringify({
+        staffId: req.params.id,
+        name: staff.name,
+        role: staff.role,
+        phone: staff.phone,
+        passwordChanged: !!updateData.password_hash,
+      }),
+      created_at: new Date(),
+    });
 
     res.json({ success: true, message: 'Staff updated.', data: staff });
   } catch (error) {
