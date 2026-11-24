@@ -21,8 +21,9 @@ const app = express();
 app.use(helmet());
 
 // CORS configuration (configurable via CORS_ORIGIN, defaults to http://localhost:3000)
+// If set to '*', origin is set to true to reflect request origin so credentials: true works without browser wildcard rejection
 const allowedOrigins = config.corsOrigin === '*'
-  ? '*'
+  ? true
   : config.corsOrigin.split(',').map((o) => o.trim());
 
 app.use(
