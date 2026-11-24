@@ -3,10 +3,10 @@
 import { useState } from 'react';
 import { X, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { appointmentAPI } from '../lib/api';
-import { getErrorMessage, getErrorCode } from '../lib/errorMessages';
-import { formatDate, formatTimeRange } from '../lib/dateTime';
-import Button from './Button';
+import { appointmentAPI } from '../../lib/api';
+import { getErrorMessage, getErrorCode } from '../../lib/errorMessages';
+import { formatDate, formatTimeRange } from '../../lib/dateTime';
+import Button from '../ui/Button';
 
 export default function CancelAppointmentModal({
   appointment,

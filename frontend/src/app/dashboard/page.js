@@ -18,13 +18,13 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
 import { appointmentAPI } from '../../lib/api';
 import { formatDate, formatTimeRange, formatWhoFor } from '../../lib/dateTime';
-import EmergencyNotice from '../../components/EmergencyNotice';
-import Card from '../../components/Card';
-import Button from '../../components/Button';
-import StatusBadge from '../../components/StatusBadge';
-import Skeleton from '../../components/Skeleton';
-import EmptyState from '../../components/EmptyState';
-import MotherBottomNav from '../../components/MotherBottomNav';
+import EmergencyNotice from '../../components/clinic/EmergencyNotice';
+import Card from '../../components/ui/Card';
+import Button from '../../components/ui/Button';
+import StatusBadge from '../../components/ui/StatusBadge';
+import Skeleton from '../../components/ui/Skeleton';
+import EmptyState from '../../components/ui/EmptyState';
+import MotherBottomNav from '../../components/clinic/MotherBottomNav';
 
 export default function DashboardPage() {
   const router = useRouter();

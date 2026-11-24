@@ -17,19 +17,19 @@ import {
   Building,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { motherAPI, clinicAPI, babyAPI, appointmentAPI } from '../lib/api';
-import { getErrorMessage, getErrorCode } from '../lib/errorMessages';
+import { motherAPI, clinicAPI, babyAPI, appointmentAPI } from '../../lib/api';
+import { getErrorMessage, getErrorCode } from '../../lib/errorMessages';
 import {
   formatDate,
   formatTimeRange,
   formatTime12,
   getLagosToday,
   formatWhoFor,
-} from '../lib/dateTime';
-import Card from './Card';
-import Button from './Button';
-import Skeleton from './Skeleton';
-import SlotPicker from './SlotPicker';
+} from '../../lib/dateTime';
+import Card from '../ui/Card';
+import Button from '../ui/Button';
+import Skeleton from '../ui/Skeleton';
+import SlotPicker from '../clinic/SlotPicker';
 
 export default function WalkInBookingModal({
   isOpen,
@@ -699,11 +699,10 @@ export default function WalkInBookingModal({
                       <div
                         key={clinic.id}
                         onClick={() => handleSelectClinic(clinic)}
-                        className={`p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
-                          isSelected
-                            ? 'border-primary-500 bg-primary-50/50 shadow-xs'
-                            : 'border-border bg-white hover:border-primary-200'
-                        }`}
+                        className={`p-3.5 rounded-xl border-2 cursor-pointer transition-all ${isSelected
+                          ? 'border-primary-500 bg-primary-50/50 shadow-xs'
+                          : 'border-border bg-white hover:border-primary-200'
+                          }`}
                       >
                         <div className="flex items-center justify-between mb-1">
                           <span className="font-bold text-xs text-body">
@@ -750,11 +749,10 @@ export default function WalkInBookingModal({
                           setBookingType(type);
                           if (type === 'mother') setSelectedBabies([]);
                         }}
-                        className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center gap-1.5 ${
-                          bookingType === type
-                            ? 'border-primary-500 bg-primary-50/60 text-primary-700 font-bold shadow-2xs'
-                            : 'border-border bg-white text-body hover:bg-clinic-50'
-                        }`}
+                        className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center gap-1.5 ${bookingType === type
+                          ? 'border-primary-500 bg-primary-50/60 text-primary-700 font-bold shadow-2xs'
+                          : 'border-border bg-white text-body hover:bg-clinic-50'
+                          }`}
                       >
                         <Icon size={18} />
                         <span className="text-xs">{label}</span>
@@ -789,16 +787,15 @@ export default function WalkInBookingModal({
                               <div
                                 key={b.id}
                                 onClick={() => handleToggleBaby(b.id)}
-                                className={`p-2.5 rounded-xl border cursor-pointer flex items-center gap-2.5 transition-all ${
-                                  isTicked
-                                    ? 'border-primary-500 bg-primary-50/50 shadow-2xs'
-                                    : 'border-border bg-white hover:border-primary-200'
-                                }`}
+                                className={`p-2.5 rounded-xl border cursor-pointer flex items-center gap-2.5 transition-all ${isTicked
+                                  ? 'border-primary-500 bg-primary-50/50 shadow-2xs'
+                                  : 'border-border bg-white hover:border-primary-200'
+                                  }`}
                               >
                                 <input
                                   type="checkbox"
                                   checked={isTicked}
-                                  onChange={() => {}}
+                                  onChange={() => { }}
                                   className="rounded text-primary-600 focus:ring-primary-500 w-4 h-4 pointer-events-none"
                                 />
                                 <div>
@@ -1049,11 +1046,10 @@ export default function WalkInBookingModal({
                   <div className="py-2 flex justify-between items-center">
                     <span className="text-body-muted">Slot Type:</span>
                     <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        selectedSlot?.is_walkin
-                          ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                          : 'bg-green-100 text-green-800 border border-green-300'
-                      }`}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${selectedSlot?.is_walkin
+                        ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                        : 'bg-green-100 text-green-800 border border-green-300'
+                        }`}
                     >
                       {selectedSlot?.is_walkin ? 'Walk-in Slot' : 'Standard Slot'}
                     </span>

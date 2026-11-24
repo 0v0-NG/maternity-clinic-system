@@ -32,14 +32,14 @@ import {
   getLagosToday,
   formatWhoFor,
 } from '../../lib/dateTime';
-import Card from '../../components/Card';
-import Button from '../../components/Button';
-import StatusBadge from '../../components/StatusBadge';
-import Skeleton from '../../components/Skeleton';
-import EmptyState from '../../components/EmptyState';
-import SlotPicker from '../../components/SlotPicker';
-import WalkInBookingModal from '../../components/WalkInBookingModal';
-import MotherLookupModal from '../../components/MotherLookupModal';
+import Card from '../../components/ui/Card';
+import Button from '../../components/ui/Button';
+import StatusBadge from '../../components/ui/StatusBadge';
+import Skeleton from '../../components/ui/Skeleton';
+import EmptyState from '../../components/ui/EmptyState';
+import SlotPicker from '../../components/clinic/SlotPicker';
+import WalkInBookingModal from '../../components/modals/WalkInBookingModal';
+import MotherLookupModal from '../../components/modals/MotherLookupModal';
 
 export default function StaffPortalPage() {
   const router = useRouter();

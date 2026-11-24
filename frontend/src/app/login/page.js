@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 import { LogIn } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { getErrorMessage } from '../../lib/errorMessages';
-import Button from '../../components/Button';
+import Button from '../../components/ui/Button';
 
 export default function LoginPage() {
   const [phone, setPhone] = useState('');

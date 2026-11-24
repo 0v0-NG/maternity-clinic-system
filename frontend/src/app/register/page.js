@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 import { ShieldCheck, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { getErrorMessage } from '../../lib/errorMessages';
-import Button from '../../components/Button';
+import Button from '../../components/ui/Button';
 
 const OTP_LENGTH = 6;
 const RESEND_SECONDS = 60;

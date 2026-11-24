@@ -18,11 +18,11 @@ import {
 import toast from 'react-hot-toast';
 import { clinicInfoAPI } from '../../lib/api';
 import { getErrorMessage } from '../../lib/errorMessages';
-import EmergencyNotice from '../../components/EmergencyNotice';
-import Card from '../../components/Card';
-import Button from '../../components/Button';
-import Skeleton from '../../components/Skeleton';
-import MotherBottomNav from '../../components/MotherBottomNav';
+import EmergencyNotice from '../../components/clinic/EmergencyNotice';
+import Card from '../../components/ui/Card';
+import Button from '../../components/ui/Button';
+import Skeleton from '../../components/ui/Skeleton';
+import MotherBottomNav from '../../components/clinic/MotherBottomNav';
 
 export default function ClinicInfoPage() {
   const router = useRouter();

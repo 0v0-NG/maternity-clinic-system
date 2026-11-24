@@ -40,10 +40,10 @@ import {
   getLagosToday,
   getLagosDaysAgo,
 } from '../../lib/dateTime';
-import Card from '../../components/Card';
-import Button from '../../components/Button';
-import Skeleton from '../../components/Skeleton';
-import EmptyState from '../../components/EmptyState';
+import Card from '../../components/ui/Card';
+import Button from '../../components/ui/Button';
+import Skeleton from '../../components/ui/Skeleton';
+import EmptyState from '../../components/ui/EmptyState';
 
 // Helper to mask sensitive fields (passwords, tokens, OTPs) from audit log details
 function maskSensitiveDetails(data) {
@@ -1138,11 +1138,10 @@ export default function AdminPortalPage() {
                 setActiveTab('dashboard');
                 setMobileMenuOpen(false);
               }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-left ${
-                activeTab === 'dashboard'
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-left ${activeTab === 'dashboard'
                   ? 'bg-primary-50 text-primary-700'
                   : 'text-body-muted hover:bg-clinic-50'
-              }`}
+                }`}
             >
               <BarChart3 size={18} /> Dashboard
             </button>
@@ -1151,11 +1150,10 @@ export default function AdminPortalPage() {
                 setActiveTab('slots');
                 setMobileMenuOpen(false);
               }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-left ${
-                activeTab === 'slots'
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-left ${activeTab === 'slots'
                   ? 'bg-primary-50 text-primary-700'
                   : 'text-body-muted hover:bg-clinic-50'
-              }`}
+                }`}
             >
               <CalendarPlus size={18} /> Slot generator
             </button>
@@ -1164,11 +1162,10 @@ export default function AdminPortalPage() {
                 setActiveTab('block_dates');
                 setMobileMenuOpen(false);
               }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-left ${
-                activeTab === 'block_dates'
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-left ${activeTab === 'block_dates'
                   ? 'bg-primary-50 text-primary-700'
                   : 'text-body-muted hover:bg-clinic-50'
-              }`}
+                }`}
             >
               <CalendarX size={18} /> Block dates
             </button>
@@ -1177,11 +1174,10 @@ export default function AdminPortalPage() {
                 setActiveTab('cancel_session');
                 setMobileMenuOpen(false);
               }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-left ${
-                activeTab === 'cancel_session'
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-left ${activeTab === 'cancel_session'
                   ? 'bg-primary-50 text-primary-700'
                   : 'text-body-muted hover:bg-clinic-50'
-              }`}
+                }`}
             >
               <AlertTriangle size={18} /> Cancel session
             </button>
@@ -1190,11 +1186,10 @@ export default function AdminPortalPage() {
                 setActiveTab('clinics');
                 setMobileMenuOpen(false);
               }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-left ${
-                activeTab === 'clinics'
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-left ${activeTab === 'clinics'
                   ? 'bg-primary-50 text-primary-700'
                   : 'text-body-muted hover:bg-clinic-50'
-              }`}
+                }`}
             >
               <Settings size={18} /> Clinic settings
             </button>
@@ -1203,11 +1198,10 @@ export default function AdminPortalPage() {
                 setActiveTab('staff');
                 setMobileMenuOpen(false);
               }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-left ${
-                activeTab === 'staff'
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-left ${activeTab === 'staff'
                   ? 'bg-primary-50 text-primary-700'
                   : 'text-body-muted hover:bg-clinic-50'
-              }`}
+                }`}
             >
               <Users size={18} /> Staff
             </button>
@@ -1216,11 +1210,10 @@ export default function AdminPortalPage() {
                 setActiveTab('audit_log');
                 setMobileMenuOpen(false);
               }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-left ${
-                activeTab === 'audit_log'
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-left ${activeTab === 'audit_log'
                   ? 'bg-primary-50 text-primary-700'
                   : 'text-body-muted hover:bg-clinic-50'
-              }`}
+                }`}
             >
               <FileText size={18} /> Audit log
             </button>
@@ -1240,11 +1233,10 @@ export default function AdminPortalPage() {
           <button
             type="button"
             onClick={() => setActiveTab('dashboard')}
-            className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition-colors text-left ${
-              activeTab === 'dashboard'
+            className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition-colors text-left ${activeTab === 'dashboard'
                 ? 'bg-primary-50 text-primary-700 font-bold'
                 : 'text-body-muted hover:bg-clinic-50 hover:text-body'
-            }`}
+              }`}
           >
             <BarChart3 size={18} />
             <span>Dashboard</span>
@@ -1252,11 +1244,10 @@ export default function AdminPortalPage() {
           <button
             type="button"
             onClick={() => setActiveTab('slots')}
-            className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition-colors text-left ${
-              activeTab === 'slots'
+            className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition-colors text-left ${activeTab === 'slots'
                 ? 'bg-primary-50 text-primary-700 font-bold'
                 : 'text-body-muted hover:bg-clinic-50 hover:text-body'
-            }`}
+              }`}
           >
             <CalendarPlus size={18} />
             <span>Slot generator</span>
@@ -1264,11 +1255,10 @@ export default function AdminPortalPage() {
           <button
             type="button"
             onClick={() => setActiveTab('block_dates')}
-            className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition-colors text-left ${
-              activeTab === 'block_dates'
+            className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition-colors text-left ${activeTab === 'block_dates'
                 ? 'bg-primary-50 text-primary-700 font-bold'
                 : 'text-body-muted hover:bg-clinic-50 hover:text-body'
-            }`}
+              }`}
           >
             <CalendarX size={18} />
             <span>Block dates</span>
@@ -1276,11 +1266,10 @@ export default function AdminPortalPage() {
           <button
             type="button"
             onClick={() => setActiveTab('cancel_session')}
-            className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition-colors text-left ${
-              activeTab === 'cancel_session'
+            className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition-colors text-left ${activeTab === 'cancel_session'
                 ? 'bg-primary-50 text-primary-700 font-bold'
                 : 'text-body-muted hover:bg-clinic-50 hover:text-body'
-            }`}
+              }`}
           >
             <AlertTriangle size={18} />
             <span>Cancel session</span>
@@ -1288,11 +1277,10 @@ export default function AdminPortalPage() {
           <button
             type="button"
             onClick={() => setActiveTab('clinics')}
-            className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition-colors text-left ${
-              activeTab === 'clinics'
+            className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition-colors text-left ${activeTab === 'clinics'
                 ? 'bg-primary-50 text-primary-700 font-bold'
                 : 'text-body-muted hover:bg-clinic-50 hover:text-body'
-            }`}
+              }`}
           >
             <Settings size={18} />
             <span>Clinic settings</span>
@@ -1300,11 +1288,10 @@ export default function AdminPortalPage() {
           <button
             type="button"
             onClick={() => setActiveTab('staff')}
-            className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition-colors text-left ${
-              activeTab === 'staff'
+            className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition-colors text-left ${activeTab === 'staff'
                 ? 'bg-primary-50 text-primary-700 font-bold'
                 : 'text-body-muted hover:bg-clinic-50 hover:text-body'
-            }`}
+              }`}
           >
             <Users size={18} />
             <span>Staff</span>
@@ -1312,11 +1299,10 @@ export default function AdminPortalPage() {
           <button
             type="button"
             onClick={() => setActiveTab('audit_log')}
-            className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition-colors text-left ${
-              activeTab === 'audit_log'
+            className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition-colors text-left ${activeTab === 'audit_log'
                 ? 'bg-primary-50 text-primary-700 font-bold'
                 : 'text-body-muted hover:bg-clinic-50 hover:text-body'
-            }`}
+              }`}
           >
             <FileText size={18} />
             <span>Audit log</span>
@@ -1344,33 +1330,30 @@ export default function AdminPortalPage() {
                     <button
                       type="button"
                       onClick={() => handlePresetChange('today')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                        dateFilter.preset === 'today'
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${dateFilter.preset === 'today'
                           ? 'bg-primary-500 text-white'
                           : 'text-body-muted hover:text-body'
-                      }`}
+                        }`}
                     >
                       Today
                     </button>
                     <button
                       type="button"
                       onClick={() => handlePresetChange('7d')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                        dateFilter.preset === '7d'
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${dateFilter.preset === '7d'
                           ? 'bg-primary-500 text-white'
                           : 'text-body-muted hover:text-body'
-                      }`}
+                        }`}
                     >
                       Last 7 days
                     </button>
                     <button
                       type="button"
                       onClick={() => handlePresetChange('30d')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                        dateFilter.preset === '30d'
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${dateFilter.preset === '30d'
                           ? 'bg-primary-500 text-white'
                           : 'text-body-muted hover:text-body'
-                      }`}
+                        }`}
                     >
                       Last 30 days
                     </button>
@@ -1904,11 +1887,10 @@ export default function AdminPortalPage() {
                         return (
                           <label
                             key={day.value}
-                            className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs cursor-pointer transition-colors ${
-                              isChecked
+                            className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs cursor-pointer transition-colors ${isChecked
                                 ? 'bg-primary-50 border-primary-500 text-primary-800 font-bold'
                                 : 'bg-white border-border text-body-muted hover:bg-clinic-50'
-                            }`}
+                              }`}
                           >
                             <input
                               type="checkbox"
@@ -2148,7 +2130,7 @@ export default function AdminPortalPage() {
                   <p className="mt-0.5">
                     The backend API applies date blocks directly to clinic schedule slots. A dedicated listing endpoint
                     to query all previously blocked dates is currently pending (documented in{' '}
-                    <code>BACKEND_REQUESTS.md</code>). Use the Unblock form above whenever a blocked date needs to be
+                    <code>docs/BACKEND_REQUESTS.md</code>). Use the Unblock form above whenever a blocked date needs to be
                     reopened.
                   </p>
                 </div>
@@ -2606,9 +2588,9 @@ export default function AdminPortalPage() {
                       onAction={
                         staffSearch || staffRoleFilter
                           ? () => {
-                              setStaffSearch('');
-                              setStaffRoleFilter('');
-                            }
+                            setStaffSearch('');
+                            setStaffRoleFilter('');
+                          }
                           : undefined
                       }
                     />
@@ -2858,11 +2840,10 @@ export default function AdminPortalPage() {
                           id="edit-staff-role"
                           required
                           disabled={currentUser?.id === editStaffForm.id}
-                          className={`input-field text-sm ${
-                            currentUser?.id === editStaffForm.id
+                          className={`input-field text-sm ${currentUser?.id === editStaffForm.id
                               ? 'bg-gray-100 text-body-muted cursor-not-allowed'
                               : 'bg-white'
-                          }`}
+                            }`}
                           value={editStaffForm.role}
                           onChange={(e) => setEditStaffForm({ ...editStaffForm, role: e.target.value })}
                         >
@@ -3178,15 +3159,14 @@ export default function AdminPortalPage() {
 
                               <td className="p-3.5 whitespace-nowrap">
                                 <span
-                                  className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold ${
-                                    isSuccess
+                                  className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold ${isSuccess
                                       ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                                       : isDanger
-                                      ? 'bg-red-50 text-red-800 border border-red-200'
-                                      : isWarn
-                                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                                      : 'bg-blue-50 text-blue-800 border border-blue-200'
-                                  }`}
+                                        ? 'bg-red-50 text-red-800 border border-red-200'
+                                        : isWarn
+                                          ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                                          : 'bg-blue-50 text-blue-800 border border-blue-200'
+                                    }`}
                                 >
                                   {log.action}
                                 </span>

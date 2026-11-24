@@ -24,12 +24,12 @@ import {
   formatTime12,
   getLagosToday,
 } from '../../lib/dateTime';
-import EmergencyNotice from '../../components/EmergencyNotice';
-import Card from '../../components/Card';
-import Button from '../../components/Button';
-import Skeleton from '../../components/Skeleton';
-import SlotPicker from '../../components/SlotPicker';
-import MotherBottomNav from '../../components/MotherBottomNav';
+import EmergencyNotice from '../../components/clinic/EmergencyNotice';
+import Card from '../../components/ui/Card';
+import Button from '../../components/ui/Button';
+import Skeleton from '../../components/ui/Skeleton';
+import SlotPicker from '../../components/clinic/SlotPicker';
+import MotherBottomNav from '../../components/clinic/MotherBottomNav';
 
 export default function BookAppointmentPage() {
   const router = useRouter();

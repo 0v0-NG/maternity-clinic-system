@@ -20,11 +20,11 @@ import toast from 'react-hot-toast';
 import { motherAPI, babyAPI, clearAuthStorage } from '../../lib/api';
 import { getErrorMessage } from '../../lib/errorMessages';
 import { formatDate, getLagosToday } from '../../lib/dateTime';
-import EmergencyNotice from '../../components/EmergencyNotice';
-import Card from '../../components/Card';
-import Button from '../../components/Button';
-import Skeleton from '../../components/Skeleton';
-import MotherBottomNav from '../../components/MotherBottomNav';
+import EmergencyNotice from '../../components/clinic/EmergencyNotice';
+import Card from '../../components/ui/Card';
+import Button from '../../components/ui/Button';
+import Skeleton from '../../components/ui/Skeleton';
+import MotherBottomNav from '../../components/clinic/MotherBottomNav';
 
 export default function ProfilePage() {
   const router = useRouter();

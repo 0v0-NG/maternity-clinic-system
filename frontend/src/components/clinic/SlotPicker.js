@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { clinicAPI } from '../lib/api';
-import { getNextDays, formatTime12 } from '../lib/dateTime';
-import Skeleton from './Skeleton';
+import { clinicAPI } from '../../lib/api';
+import { getNextDays, formatTime12 } from '../../lib/dateTime';
+import Skeleton from '../ui/Skeleton';
 
 const SlotPicker = forwardRef(function SlotPicker(
   {

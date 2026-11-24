@@ -3,11 +3,11 @@
 import { useState, useRef } from 'react';
 import { X, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { appointmentAPI } from '../lib/api';
-import { getErrorMessage, getErrorCode } from '../lib/errorMessages';
-import { formatDate, formatTimeRange, formatTime12 } from '../lib/dateTime';
-import SlotPicker from './SlotPicker';
-import Button from './Button';
+import { appointmentAPI } from '../../lib/api';
+import { getErrorMessage, getErrorCode } from '../../lib/errorMessages';
+import { formatDate, formatTimeRange, formatTime12 } from '../../lib/dateTime';
+import SlotPicker from '../clinic/SlotPicker';
+import Button from '../ui/Button';
 
 export default function RescheduleAppointmentModal({
   appointment,

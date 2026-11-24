@@ -7,15 +7,15 @@ import { Calendar, Clock, Plus, Baby, Eye, RefreshCw, XCircle } from 'lucide-rea
 import toast from 'react-hot-toast';
 import { appointmentAPI } from '../../lib/api';
 import { formatDate, formatTimeRange, formatWhoFor } from '../../lib/dateTime';
-import EmergencyNotice from '../../components/EmergencyNotice';
-import Card from '../../components/Card';
-import Button from '../../components/Button';
-import StatusBadge from '../../components/StatusBadge';
-import Skeleton from '../../components/Skeleton';
-import EmptyState from '../../components/EmptyState';
-import MotherBottomNav from '../../components/MotherBottomNav';
-import CancelAppointmentModal from '../../components/CancelAppointmentModal';
-import RescheduleAppointmentModal from '../../components/RescheduleAppointmentModal';
+import EmergencyNotice from '../../components/clinic/EmergencyNotice';
+import Card from '../../components/ui/Card';
+import Button from '../../components/ui/Button';
+import StatusBadge from '../../components/ui/StatusBadge';
+import Skeleton from '../../components/ui/Skeleton';
+import EmptyState from '../../components/ui/EmptyState';
+import MotherBottomNav from '../../components/clinic/MotherBottomNav';
+import CancelAppointmentModal from '../../components/modals/CancelAppointmentModal';
+import RescheduleAppointmentModal from '../../components/modals/RescheduleAppointmentModal';
 
 export default function AppointmentsPage() {
   const router = useRouter();
