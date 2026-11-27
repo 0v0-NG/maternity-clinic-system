@@ -343,7 +343,7 @@ export default function QueueTrackerPage() {
 
             {/* STATE 2: Status 'in_consultation' (It's her turn!) */}
             {effectiveStatus === 'in_consultation' && (
-              <Card className="p-6 text-center space-y-4 border-2 border-primary-500 bg-emerald-50/60 shadow-md">
+              <Card className="p-6 text-center space-y-4 border-2 border-primary-500 bg-primary-50/80 shadow-md">
                 <div className="w-16 h-16 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center mx-auto animate-pulse shadow-sm">
                   <CheckCircle2 size={36} />
                 </div>

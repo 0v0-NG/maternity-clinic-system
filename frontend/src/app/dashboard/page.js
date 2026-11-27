@@ -258,7 +258,7 @@ export default function DashboardPage() {
 
             <Link href="/profile" className="block">
               <Card className="p-4 flex flex-col items-center justify-center text-center gap-2 hover:border-primary-400 hover:shadow-md transition-all h-28">
-                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-primary-100 text-primary-500 flex items-center justify-center">
                   <User size={22} />
                 </div>
                 <span className="font-semibold text-xs text-body leading-tight">

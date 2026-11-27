@@ -6,35 +6,35 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Nigerian green & white palette (DESIGN)
-        // `primary` keeps its numeric keys so existing classes keep resolving,
-        // now anchored to the DESIGN primary green #008751.
+        // Bayero University Kano (buk.edu.ng) official blue & sky-turquoise palette
+        // Extracted from buk.edu.ng Showcase+ color-blue.css:
+        // Base color: #08A7FD (primary-400) | Dark institutional color: #02669D (primary-500 / clinic-dark)
         primary: {
-          50: '#E8F5EE',   // light tint
-          100: '#CDF0DA',
-          200: '#ADE5C2',
-          300: '#82DAAA',
-          400: '#57CF92',
-          500: '#008751',  // primary green
-          600: '#006E3E',
-          700: '#005A38',  // dark green
-          800: '#00472C',
-          900: '#00331E',
+          50: '#EFF8FF',   // ultra-light sky tint
+          100: '#D9F0FE',  // soft sky badge tint
+          200: '#B5E2FD',  // subtle sky border
+          300: '#75CBFC',  // medium sky highlight
+          400: '#08A7FD',  // BUK official base sky-turquoise blue (#08a7fd)
+          500: '#02669D',  // BUK official institutional dark blue (#02669d)
+          600: '#025B8C',
+          700: '#014D78',  // deeper hover & heading tone
+          800: '#013C5E',
+          900: '#002942',
         },
         clinic: {
-          50: '#E8F5EE',   // light tint
-          100: '#CDF0DA',
-          200: '#ADE5C2',
-          300: '#82DAAA',
-          400: '#57CF92',
-          500: '#008751',  // primary green
-          600: '#006E3E',
-          700: '#005A38',  // dark green
-          800: '#00472C',
-          900: '#00331E',
+          50: '#EFF8FF',   // light BUK sky tint
+          100: '#D9F0FE',
+          200: '#B5E2FD',
+          300: '#75CBFC',
+          400: '#08A7FD',  // BUK official base sky-turquoise blue (#08a7fd)
+          500: '#02669D',  // BUK official institutional dark blue (#02669d)
+          600: '#025B8C',
+          700: '#014D78',
+          800: '#013C5E',
+          900: '#002942',
         },
-        'clinic-dark': '#005A38',
-        'clinic-tint': '#E8F5EE',
+        'clinic-dark': '#02669D',
+        'clinic-tint': '#EFF8FF',
         body: '#1F2937',        // body text
         'body-muted': '#6B7280', // muted text
         border: '#E5E7EB',      // borders

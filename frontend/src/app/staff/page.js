@@ -871,7 +871,7 @@ export default function StaffPortalPage() {
                             key={item.id || item.queue_number}
                             className={`p-2.5 rounded-xl border text-xs flex items-center justify-between transition-colors ${
                               item.status === 'in_consultation'
-                                ? 'bg-emerald-50 border-emerald-300 font-bold'
+                                ? 'bg-primary-50 border-primary-400 font-bold'
                                 : 'bg-white border-border'
                             }`}
                           >
@@ -979,7 +979,7 @@ export default function StaffPortalPage() {
                         return (
                           <Card
                             key={appt.id}
-                            className="p-5 border-2 border-primary-500 bg-emerald-50/40 shadow-sm space-y-4"
+                            className="p-5 border-2 border-primary-500 bg-primary-50/60 shadow-sm space-y-4"
                           >
                             <div className="flex flex-wrap items-start justify-between gap-3">
                               <div>
