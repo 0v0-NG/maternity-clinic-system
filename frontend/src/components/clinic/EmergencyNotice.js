@@ -1,7 +1,7 @@
 export default function EmergencyNotice() {
   return (
     <div className="bg-status-emergency text-white px-4 py-3 text-sm font-semibold">
-      Labour or an emergency? This clinic does not handle deliveries or emergencies. Go straight to the nearest hospital emergency unit.
+      For emergencies, please go directly to the Emergency Unit. This system is for scheduled clinic appointments only.
     </div>
   );
 }

@@ -81,7 +81,7 @@ app.get('/api/emergency-notice', (req, res) => {
   res.json({
     success: true,
     message:
-      'Labour or an emergency? This clinic does not handle deliveries or emergencies. Go straight to the nearest hospital emergency unit.',
+      'For emergencies, please go directly to the Emergency Unit. This system is for scheduled clinic appointments only.',
   });
 });
 

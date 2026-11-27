@@ -201,7 +201,7 @@ export default function ClinicInfoPage() {
                 </h2>
               </div>
               <p className="text-xs text-red-900 font-semibold leading-relaxed">
-                Labour or an emergency? This clinic does not handle deliveries or emergencies. Go straight to the nearest hospital emergency unit.
+                For emergencies, please go directly to the Emergency Unit. This system is for scheduled clinic appointments only.
               </p>
             </Card>
 

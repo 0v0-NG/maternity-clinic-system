@@ -57,7 +57,7 @@ This document defines click-by-click manual testing procedures for verifying the
    - Header shows clinic brand and personalized greeting: *"Hello, Test 👋"*.
    - Logout button in header properly clears storage and returns to `/login`.
 3. **Emergency Notice**:
-   - Top of screen displays red Emergency Notice banner: *"Labour or an emergency? This clinic does not handle deliveries or emergencies. Go straight to the nearest hospital emergency unit."*.
+   - Top of screen displays red Emergency Notice banner: *"For emergencies, please go directly to the Emergency Unit. This system is for scheduled clinic appointments only."*.
 4. **Empty State (Initial)**:
    - Before any appointment is booked, the Next Appointment card shows:
      - Calendar icon.
@@ -348,7 +348,7 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
 3. **Verify Header**:
    - Header title: *"Live Clinic Queue"*.
    - Back arrow navigates back to `/dashboard`.
-   - Emergency notice is displayed at the top: *"Labour or an emergency? This clinic does not handle deliveries or emergencies. Go straight to the nearest hospital emergency unit."*.
+   - Emergency notice is displayed at the top: *"For emergencies, please go directly to the Emergency Unit. This system is for scheduled clinic appointments only."*.
 4. **Verify Empty State**:
    - Clock icon is horizontally centered.
    - Title: *"No Appointments Today"*.
@@ -492,7 +492,7 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
 2. From `/profile`, tap the **Hospital & Clinic Information** card.
 3. Verify page loads at `/clinic-info` with:
    - Header with back button to `/dashboard` and refresh icon.
-   - Top emergency banner: *"Labour or an emergency? This clinic does not handle deliveries or emergencies. Go straight to the nearest hospital emergency unit."*.
+   - Top emergency banner: *"For emergencies, please go directly to the Emergency Unit. This system is for scheduled clinic appointments only."*.
    - Bottom navigation bar visible and fixed.
 
 #### B. Medical Facility, Contacts & Google Maps
@@ -503,9 +503,9 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
    - Click **Open in Google Maps**:
      - Opens Google Maps search link in a new browser tab (`target="_blank" rel="noopener noreferrer"`).
 
-#### C. Emergency Notice Card (No Deliveries/Emergencies)
+#### C. Emergency Notice Card
 1. **Verify Emergency Notice Card**:
-   - Displays red **Emergency Notice** card stating: *"Labour or an emergency? This clinic does not handle deliveries or emergencies. Go straight to the nearest hospital emergency unit."*.
+   - Displays red **Emergency Notice** card stating: *"For emergencies, please go directly to the Emergency Unit. This system is for scheduled clinic appointments only."*.
    - Verify no emergency unit phone number or 24/7 emergency call button is displayed.
 
 #### D. Clinic Schedules & Indicative Booking Notice

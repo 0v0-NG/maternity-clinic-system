@@ -256,13 +256,13 @@ describe('Auth Endpoints', () => {
       await db('clinics').whereIn('id', [ancId, pncId]).del();
     });
 
-    it('should return the clinic-wide non-emergency notice on GET /api/emergency-notice', async () => {
+    it('should return the emergency notice on GET /api/emergency-notice', async () => {
       const res = await request(app).get('/api/emergency-notice');
 
       expect(res.statusCode).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.message).toBe(
-        'Labour or an emergency? This clinic does not handle deliveries or emergencies. Go straight to the nearest hospital emergency unit.'
+        'For emergencies, please go directly to the Emergency Unit. This system is for scheduled clinic appointments only.'
       );
     });
   });
