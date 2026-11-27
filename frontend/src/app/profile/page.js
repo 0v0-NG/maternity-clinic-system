@@ -352,7 +352,7 @@ export default function ProfilePage() {
                   </span>
                 </div>
 
-                {/* Hospital ID & HMO/NHIA Number */}
+                {/* Hospital ID & NHIS number */}
                 <div className="grid grid-cols-2 gap-2.5">
                   <div>
                     <label className="block text-xs font-semibold text-body mb-1">
@@ -371,7 +371,7 @@ export default function ProfilePage() {
 
                   <div>
                     <label className="block text-xs font-semibold text-body mb-1">
-                      HMO / NHIA No.
+                      NHIS number
                     </label>
                     <input
                       type="text"
@@ -379,7 +379,7 @@ export default function ProfilePage() {
                       onChange={(e) =>
                         setProfile({ ...profile, hmo_number: e.target.value })
                       }
-                      placeholder="Optional"
+                      placeholder="NHIS number (optional)"
                       className="w-full text-xs px-3 py-2.5 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                     />
                   </div>
@@ -684,7 +684,7 @@ export default function ProfilePage() {
                       Hospital & Clinic Information
                     </span>
                     <span className="text-[11px] text-body-muted block">
-                      Operating hours, location & emergency triage
+                      Operating hours, location & clinic contacts
                     </span>
                   </div>
                 </div>

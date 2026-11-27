@@ -438,7 +438,7 @@ export default function WalkInBookingModal({
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search by mother's name or phone number..."
+                        placeholder="Search by name, phone, folder number, or NHIS number..."
                         className="w-full text-xs pl-9 pr-4 py-2.5 bg-white border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-xs"
                         autoFocus
                       />
@@ -487,7 +487,10 @@ export default function WalkInBookingModal({
                               </div>
                               <p className="text-[11px] text-body-muted">
                                 Phone: <strong>{m.phone}</strong>
-                                {m.hospital_id && ` · ID: ${m.hospital_id}`}
+                              </p>
+                              <p className="text-[11px] text-body-muted">
+                                Folder: <strong>{m.hospital_id || 'None'}</strong> · NHIS:{' '}
+                                <strong>{m.hmo_number || 'None'}</strong>
                               </p>
                             </div>
                           </div>
@@ -585,7 +588,7 @@ export default function WalkInBookingModal({
 
                   <div className="space-y-1">
                     <label className="block text-xs font-bold text-body">
-                      Phone Number *
+                      Phone number for SMS (can be a husband&apos;s or relative&apos;s number) *
                     </label>
                     <input
                       type="tel"
@@ -612,13 +615,13 @@ export default function WalkInBookingModal({
                     </div>
                     <div className="space-y-1">
                       <label className="block text-xs font-bold text-body">
-                        HMO / NHIA Number (Optional)
+                        NHIS number (Optional)
                       </label>
                       <input
                         type="text"
                         value={regHmoNumber}
                         onChange={(e) => setRegHmoNumber(e.target.value)}
-                        placeholder="e.g. HMO-5678"
+                        placeholder="e.g. NHIS-5678"
                         className="w-full text-xs px-3 py-2 bg-white border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                       />
                     </div>

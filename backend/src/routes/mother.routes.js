@@ -36,7 +36,7 @@ router.post(
     body('name').trim().notEmpty().withMessage('Mother name is required.'),
     body('phone').trim().notEmpty().withMessage('Phone number is required.'),
     body('hospital_id').optional({ nullable: true }).trim().isLength({ max: 50 }).withMessage('Hospital ID must not exceed 50 characters.'),
-    body('hmo_number').optional({ nullable: true }).trim().isLength({ max: 50 }).withMessage('HMO number must not exceed 50 characters.'),
+    body('hmo_number').optional({ nullable: true }).trim().isLength({ max: 50 }).withMessage('NHIS number must not exceed 50 characters.'),
   ]),
   motherController.registerMotherByStaff
 );

@@ -278,7 +278,7 @@ export default function DashboardPage() {
                       Hospital & Clinic Information
                     </span>
                     <span className="text-[11px] text-body-muted block">
-                      Operating hours, location & emergency triage
+                      Operating hours, location & clinic contacts
                     </span>
                   </div>
                 </div>
@@ -292,7 +292,7 @@ export default function DashboardPage() {
         <div className="bg-white rounded-xl border border-border p-4 text-xs text-body-muted flex items-center gap-3">
           <Heart size={20} className="text-primary-500 flex-shrink-0" />
           <p>
-            Please arrive at least 15 minutes before your consultation time to check in at the front desk.
+            Please arrive at least 30 minutes before your consultation time to check in at the front desk.
           </p>
         </div>
       </main>

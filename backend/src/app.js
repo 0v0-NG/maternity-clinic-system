@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const config = require('./config');
+const db = require('./config/database');
 const { errorHandler } = require('./middleware/errorHandler');
 const clinicInfo = require('./config/clinicInfo');
 
@@ -79,16 +80,43 @@ app.use('/api/admin', adminRoutes);
 app.get('/api/emergency-notice', (req, res) => {
   res.json({
     success: true,
-    message: 'For emergencies, please proceed directly to the Emergency Unit. This system is for scheduled clinic visits only.',
+    message:
+      'Labour or an emergency? This clinic does not handle deliveries or emergencies. Go straight to the nearest hospital emergency unit.',
   });
 });
 
 // --- Public Clinic Information ---
-app.get('/api/clinic-info', (req, res) => {
-  res.json({
-    success: true,
-    data: clinicInfo,
-  });
+app.get('/api/clinic-info', async (req, res, next) => {
+  try {
+    const clinics = await db('clinics').select('name', 'slot_duration_min');
+    const ancClinic = clinics.find((c) => {
+      const n = c.name.toLowerCase();
+      return n.includes('antenatal') || n.includes('ante-natal');
+    });
+    const pncClinic = clinics.find((c) => {
+      const n = c.name.toLowerCase();
+      return n.includes('postnatal') || n.includes('post-natal');
+    });
+
+    res.json({
+      success: true,
+      data: {
+        ...clinicInfo,
+        clinicDaysAndHours: {
+          antenatal: {
+            ...clinicInfo.clinicDaysAndHours.antenatal,
+            slotDurationMinutes: ancClinic ? ancClinic.slot_duration_min : null,
+          },
+          postnatal: {
+            ...clinicInfo.clinicDaysAndHours.postnatal,
+            slotDurationMinutes: pncClinic ? pncClinic.slot_duration_min : null,
+          },
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 // --- 404 Handler ---

@@ -336,7 +336,7 @@ export default function QueueTrackerPage() {
                 <div className="bg-white border border-amber-200 rounded-xl p-3 text-xs text-body-muted text-left space-y-1">
                   <p className="font-semibold text-body">Check-in Instructions:</p>
                   <p>• Have your Hospital Folder number ready.</p>
-                  <p>• Arrive at least 15 minutes before your slot time.</p>
+                  <p>• Arrive at least 30 minutes before your slot time.</p>
                 </div>
               </Card>
             )}

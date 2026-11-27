@@ -315,10 +315,18 @@ const generateSlots = async (req, res, next) => {
       });
     }
 
-    // Mark about 20% of each day's slots as walk-in (spread throughout the day, e.g. index % 5 === 2)
-    const slotsWithWalkin = dailySlotTemplates.map((slot, index) => ({
+    // Spread walk-in slots evenly through the day using clinic's walkin_reserve_pct
+    const rawWalkinPct = clinic.walkin_reserve_pct;
+    const walkinPct =
+      rawWalkinPct === null || rawWalkinPct === undefined
+        ? 0.2
+        : Math.min(Math.max(Number(rawWalkinPct), 0), 1);
+
+    const slotsWithWalkin = dailySlotTemplates.map((slot, i) => ({
       ...slot,
-      is_walkin: index % 5 === 2,
+      is_walkin:
+        Math.floor(Number(((i + 1) * walkinPct).toFixed(9))) >
+        Math.floor(Number((i * walkinPct).toFixed(9))),
     }));
 
     let createdCount = 0;

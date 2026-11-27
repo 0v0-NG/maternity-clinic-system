@@ -238,8 +238,8 @@ describe('Security, Walk-in Rules, and Audit Logging', () => {
         id: noShowSlotId,
         clinic_id: clinicId,
         slot_date: todayDate,
-        start_time: '07:00:00',
-        end_time: '07:20:00',
+        start_time: '01:00:00',
+        end_time: '01:20:00',
         is_walkin: false,
         is_blocked: false,
       });
@@ -281,7 +281,7 @@ describe('Security, Walk-in Rules, and Audit Logging', () => {
     });
 
     it('should allow front desk and admin to mark status no_show (after grace period)', async () => {
-      // Slot was 07:00:00 today. Cutoff (07:15) has expired.
+      // Slot was 01:00:00 today. Cutoff (01:30, 30-min grace) has expired.
       const res = await request(app)
         .put(`/api/appointments/${noShowApptId}/status`)
         .set('Authorization', `Bearer ${staffToken}`)
@@ -503,7 +503,8 @@ describe('Security, Walk-in Rules, and Audit Logging', () => {
       expect(res.body.message).toContain('31 days');
     });
 
-    it('should generate slots, spread walk-ins evenly (~20%), skip existing on repeat, and write audit log', async () => {
+    it('should generate slots reading clinics.walkin_reserve_pct for p = 0, 0.2, and 0.5, skip existing on repeat, and write audit log', async () => {
+      // 1. Default clinic walkin_reserve_pct = 0.2 (08:00 - 11:20 => 10 x 20-min slots per day)
       const genRes = await request(app)
         .post('/api/admin/slots/generate')
         .set('Authorization', `Bearer ${adminToken}`)
@@ -512,13 +513,13 @@ describe('Security, Walk-in Rules, and Audit Logging', () => {
           from_date: '2027-03-01',
           to_date: '2027-03-02',
           start_time: '08:00',
-          end_time: '10:00',
+          end_time: '11:20',
           weekdays: [1, 2],
         });
 
       expect(genRes.statusCode).toBe(201);
       expect(genRes.body.success).toBe(true);
-      expect(genRes.body.data.created).toBe(12);
+      expect(genRes.body.data.created).toBe(20);
       expect(genRes.body.data.skipped).toBe(0);
 
       const slots = await db('schedule_slots')
@@ -526,11 +527,16 @@ describe('Security, Walk-in Rules, and Audit Logging', () => {
         .whereIn('slot_date', ['2027-03-01', '2027-03-02'])
         .orderBy('start_time', 'asc');
 
-      const walkinCount = slots.filter((s) => Boolean(s.is_walkin)).length;
-      expect(walkinCount).toBeGreaterThan(0);
       const day1Slots = slots.filter((s) => s.slot_date === '2027-03-01');
-      expect(Boolean(day1Slots[2].is_walkin)).toBe(true);
+      expect(day1Slots.length).toBe(10);
+      // With p = 0.2 and floor((i+1)*0.2) > floor(i*0.2): indices 4 and 9 are walk-in (2 out of 10, spread evenly)
+      expect(day1Slots.filter((s) => Boolean(s.is_walkin)).length).toBe(2);
+      expect(day1Slots.map((s) => Boolean(s.is_walkin))).toEqual([
+        false, false, false, false, true,
+        false, false, false, false, true,
+      ]);
 
+      // Repeat call skips all existing slots
       const repeatRes = await request(app)
         .post('/api/admin/slots/generate')
         .set('Authorization', `Bearer ${adminToken}`)
@@ -539,13 +545,60 @@ describe('Security, Walk-in Rules, and Audit Logging', () => {
           from_date: '2027-03-01',
           to_date: '2027-03-02',
           start_time: '08:00',
-          end_time: '10:00',
+          end_time: '11:20',
           weekdays: [1, 2],
         });
 
       expect(repeatRes.statusCode).toBe(201);
       expect(repeatRes.body.data.created).toBe(0);
-      expect(repeatRes.body.data.skipped).toBe(12);
+      expect(repeatRes.body.data.skipped).toBe(20);
+
+      // 2. Test p = 0 (no walk-in slots)
+      await db('clinics').where('id', clinicId).update({ walkin_reserve_pct: 0 });
+      const genZeroRes = await request(app)
+        .post('/api/admin/slots/generate')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          clinic_id: clinicId,
+          from_date: '2027-03-08',
+          to_date: '2027-03-08',
+          start_time: '08:00',
+          end_time: '11:20',
+          weekdays: [1],
+        });
+      expect(genZeroRes.statusCode).toBe(201);
+      const zeroSlots = await db('schedule_slots')
+        .where({ clinic_id: clinicId, slot_date: '2027-03-08' })
+        .orderBy('start_time', 'asc');
+      expect(zeroSlots.length).toBe(10);
+      expect(zeroSlots.filter((s) => Boolean(s.is_walkin)).length).toBe(0);
+
+      // 3. Test p = 0.5 (50% walk-in slots spread evenly: every second slot)
+      await db('clinics').where('id', clinicId).update({ walkin_reserve_pct: 0.5 });
+      const genHalfRes = await request(app)
+        .post('/api/admin/slots/generate')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          clinic_id: clinicId,
+          from_date: '2027-03-09',
+          to_date: '2027-03-09',
+          start_time: '08:00',
+          end_time: '11:20',
+          weekdays: [2],
+        });
+      expect(genHalfRes.statusCode).toBe(201);
+      const halfSlots = await db('schedule_slots')
+        .where({ clinic_id: clinicId, slot_date: '2027-03-09' })
+        .orderBy('start_time', 'asc');
+      expect(halfSlots.length).toBe(10);
+      expect(halfSlots.filter((s) => Boolean(s.is_walkin)).length).toBe(5);
+      expect(halfSlots.map((s) => Boolean(s.is_walkin))).toEqual([
+        false, true, false, true, false,
+        true, false, true, false, true,
+      ]);
+
+      // Restore clinic walkin_reserve_pct
+      await db('clinics').where('id', clinicId).update({ walkin_reserve_pct: 0.2 });
 
       const auditLog = await db('audit_logs')
         .where('action', 'GENERATE_SLOTS')

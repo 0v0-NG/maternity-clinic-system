@@ -88,8 +88,8 @@ export default function HomePage() {
       <section className="bg-red-50 border-t border-b border-red-200 py-6">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <p className="text-red-800 font-semibold">
-            ⚠️ For emergencies, please go directly to the Emergency Unit.
-            This system is for scheduled clinic appointments only.
+            ⚠️ Labour or an emergency? This clinic does not handle deliveries or emergencies.
+            Go straight to the nearest hospital emergency unit.
           </p>
         </div>
       </section>

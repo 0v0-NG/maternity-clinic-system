@@ -439,11 +439,17 @@ export default function AdminPortalPage() {
 
   const selectedClinicForSlots = clinics.find((c) => c.id === slotsForm.clinic_id) || clinics[0];
   const slotDurationMin = selectedClinicForSlots?.slot_duration_min || 20;
+  const walkinReservePct =
+    selectedClinicForSlots?.walkin_reserve_pct === null ||
+    selectedClinicForSlots?.walkin_reserve_pct === undefined
+      ? 0.2
+      : Math.min(Math.max(Number(selectedClinicForSlots.walkin_reserve_pct), 0), 1);
+  const walkinReservePctDisplay = Math.round(walkinReservePct * 100);
   const startMins = timeToMinutes(slotsForm.start_time);
   const endMins = timeToMinutes(slotsForm.end_time);
   const dailySpanMins = Math.max(0, endMins - startMins);
   const approxSlotsDaily = slotDurationMin > 0 ? Math.floor(dailySpanMins / slotDurationMin) : 0;
-  const approxWalkInDaily = Math.round(approxSlotsDaily * 0.2);
+  const approxWalkInDaily = Math.floor(Number((approxSlotsDaily * walkinReservePct).toFixed(9)));
   const approxRegularDaily = Math.max(0, approxSlotsDaily - approxWalkInDaily);
   const slotsDateDiff = calculateDiffDays(slotsForm.from_date, slotsForm.to_date);
 
@@ -1705,7 +1711,7 @@ export default function AdminPortalPage() {
               <div>
                 <h2 className="text-xl font-bold text-body">Generate Clinic Slots</h2>
                 <p className="text-sm text-body-muted">
-                  Bulk create appointment slots across date ranges. Spreads ~20% walk-in slots evenly across days.
+                  Bulk create appointment slots across date ranges. Spreads this clinic&apos;s saved walk-in share ({walkinReservePctDisplay}%) evenly across days.
                 </p>
               </div>
 
@@ -1937,7 +1943,8 @@ export default function AdminPortalPage() {
                     </div>
                     <p className="text-body leading-relaxed">
                       <strong>{slotDurationMin}-min slots</strong> ·{' '}
-                      <strong>~{approxSlotsDaily} slots/day</strong> ({approxRegularDaily} standard + ~{approxWalkInDaily} held for walk-ins, ~20% share) across selected weekdays ({slotsDateDiff} day date range).
+                      <strong>{walkinReservePctDisplay}% walk-in share</strong> ·{' '}
+                      <strong>~{approxSlotsDaily} slots/day</strong> ({approxRegularDaily} standard + {approxWalkInDaily} held for walk-ins) across selected weekdays ({slotsDateDiff} day date range).
                     </p>
                   </div>
 
@@ -3430,7 +3437,7 @@ export default function AdminPortalPage() {
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900">
                 <strong>Idempotent & Safe:</strong>
                 <p className="mt-0.5">
-                  Any existing slots on these dates will be preserved and skipped. Approximately 20% of generated slots will be marked as walk-in slots.
+                  Any existing slots on these dates will be preserved and skipped. Using {slotDurationMin}-min slots, {walkinReservePctDisplay}% of generated slots ({approxWalkInDaily} per day) will be marked as walk-in slots.
                 </p>
               </div>
             </div>

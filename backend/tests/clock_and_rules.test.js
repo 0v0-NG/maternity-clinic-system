@@ -429,10 +429,10 @@ describe('A1 & A2: Past Slots and Controlled Clock Cutoff Rules', () => {
       expect(res.body.error.code).toBe('CHECKIN_NOT_ALLOWED');
     });
 
-    it('should allow check-in at start+10 min with late_arrival = false', async () => {
-      // Slot starts at 10:00:00. Clock at 10:10:00 (+10 min, within 15 min grace)
+    it('should allow check-in at start+25 min with late_arrival = false (within 30-minute grace)', async () => {
+      // Slot starts at 10:00:00. Clock at 10:25:00 (+25 min, within 30 min grace)
       jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
-      jest.setSystemTime(new Date('2026-12-25T10:10:00+01:00'));
+      jest.setSystemTime(new Date('2026-12-25T10:25:00+01:00'));
 
       const res = await request(app)
         .post(`/api/appointments/${apptEarlyId}/checkin`)
@@ -448,10 +448,10 @@ describe('A1 & A2: Past Slots and Controlled Clock Cutoff Rules', () => {
       expect(Boolean(inDb.late_arrival)).toBe(false);
     });
 
-    it('should allow check-in at start+25 min with late_arrival = true and place mother at end of queue', async () => {
-      // Slot starts at 10:00:00. Clock at 10:25:00 (+25 min, beyond 15 min grace)
+    it('should allow check-in at start+35 min with late_arrival = true and place mother at end of queue', async () => {
+      // Slot starts at 10:00:00. Clock at 10:35:00 (+35 min, beyond 30 min grace)
       jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
-      jest.setSystemTime(new Date('2026-12-25T10:25:00+01:00'));
+      jest.setSystemTime(new Date('2026-12-25T10:35:00+01:00'));
 
       const res = await request(app)
         .post(`/api/appointments/${apptLateId}/checkin`)
@@ -465,7 +465,7 @@ describe('A1 & A2: Past Slots and Controlled Clock Cutoff Rules', () => {
       expect(inDb.status).toBe('checked_in');
       expect(Boolean(inDb.late_arrival)).toBe(true);
 
-      // Check queue position: late arrival checked in at 10:25, early arrival checked in at 10:10
+      // Check queue position: late arrival checked in at 10:35, early arrival checked in at 10:25
       // Late mother must be position 2 (after early mother)
       const posRes = await request(app)
         .get(`/api/queue/position/${apptLateId}`)
@@ -502,11 +502,11 @@ describe('A1 & A2: Past Slots and Controlled Clock Cutoff Rules', () => {
       expect(lateEntry.mother_name).toBe('Late Mother');
     });
 
-    it('should refuse marking no_show at start+10 min with 400 NO_SHOW_TOO_EARLY', async () => {
-      // Slot starts at 11:00:00. Grace cutoff is 11:15:00.
-      // Clock at 11:10:00 (+10 min, within grace period)
+    it('should refuse marking no_show at start+20 min with 400 NO_SHOW_TOO_EARLY (within 30-minute grace)', async () => {
+      // Slot starts at 11:00:00. Grace cutoff is 11:30:00.
+      // Clock at 11:20:00 (+20 min, within 30 min grace period)
       jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
-      jest.setSystemTime(new Date('2026-12-25T11:10:00+01:00'));
+      jest.setSystemTime(new Date('2026-12-25T11:20:00+01:00'));
 
       const res = await request(app)
         .put(`/api/appointments/${apptNoShowId}/status`)
@@ -517,11 +517,11 @@ describe('A1 & A2: Past Slots and Controlled Clock Cutoff Rules', () => {
       expect(res.body.error.code).toBe('NO_SHOW_TOO_EARLY');
     });
 
-    it('should allow marking no_show at start+20 min (after grace expires)', async () => {
-      // Slot starts at 11:00:00. Grace cutoff was 11:15:00.
-      // Clock at 11:20:00 (+20 min, grace expired)
+    it('should allow marking no_show at start+35 min (after 30-minute grace expires)', async () => {
+      // Slot starts at 11:00:00. Grace cutoff was 11:30:00.
+      // Clock at 11:35:00 (+35 min, grace expired)
       jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
-      jest.setSystemTime(new Date('2026-12-25T11:20:00+01:00'));
+      jest.setSystemTime(new Date('2026-12-25T11:35:00+01:00'));
 
       const res = await request(app)
         .put(`/api/appointments/${apptNoShowId}/status`)

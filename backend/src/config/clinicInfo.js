@@ -1,43 +1,46 @@
 /**
  * Clinic & Hospital Information Configuration
  *
- * NOTICE: The values in this file (hospital metadata, days, hours, and contacts)
- * are demonstration placeholders. They must be replaced with the hospital's verified
- * institutional timetable and contact details upon production deployment.
+ * CONFIRMED FROM HOSPITAL INTERVIEW:
+ * Hospital identity, physical address, clinic contacts, operating days/hours,
+ * and registration/immunisation session notes below are verified institutional details
+ * from University Health Services, Bayero University, Kano - Ante-Natal Clinic.
  *
- * Schedular consistency:
- * The days, hours, and slot durations below match exactly what the slot generator
- * (POST /api/admin/slots/generate) and the demo database seeds (02_seed_demo_slots.js)
- * generate:
- * - Antenatal: Monday through Friday, 08:00 - 12:00, 20-minute slots.
- * - Postnatal: Monday through Friday, 13:00 - 16:00, 30-minute slots.
+ * Slot length (`slotDurationMinutes`) is NOT hard-coded here; GET /api/clinic-info
+ * reads `slot_duration_min` dynamically from the `clinics` database table.
  */
 module.exports = {
-  // PLACEHOLDER: Full institutional name of the hospital
-  hospitalName: 'General Hospital Lagos / Federal Medical Centre',
+  // Confirmed from hospital interview
+  confirmedFromInterview: true,
 
-  // PLACEHOLDER: Physical street address of the hospital
-  address: '123 Broad Street, Lagos Island, Lagos State, Nigeria',
+  // Confirmed from hospital interview: Full institutional name
+  hospitalName: 'University Health Services, Bayero University, Kano - Ante-Natal Clinic',
 
-  // PLACEHOLDER: Operating days and hours for Antenatal and Postnatal clinic sessions
+  // Confirmed from hospital interview: Physical address
+  address: 'Inside the main University Health Services Clinic, BUK New Site, Rimin Gata, Gwarzo Road, Kano',
+
+  // Confirmed from hospital interview: Clinic telephone and email contacts
+  clinicPhone: '0810 704 7641',
+  clinicEmail: 'info.clinic@buk.edu.ng',
+
+  // Confirmed from hospital interview: Operating days and hours (slotDurationMinutes read from clinics table)
   clinicDaysAndHours: {
     antenatal: {
-      days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-      hours: '08:00 - 12:00',
-      slotDurationMinutes: 20,
-      description: 'Antenatal clinic sessions run Monday through Friday mornings (08:00 - 12:00) with 20-minute consultation slots.',
+      days: ['Tuesday', 'Thursday'],
+      hours: 'About 09:30 to mid-day',
+      description: 'Antenatal clinic runs on Tuesday and Thursday, about 09:30 to mid-day.',
     },
     postnatal: {
-      days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-      hours: '13:00 - 16:00',
-      slotDurationMinutes: 30,
-      description: 'Postnatal clinic sessions run Monday through Friday afternoons (13:00 - 16:00) with 30-minute consultation slots.',
+      days: ['Tuesday', 'Thursday'],
+      hours: 'About 09:30 to mid-day',
+      description: 'Postnatal clinic runs on Tuesday and Thursday, about 09:30 to mid-day.',
     },
   },
 
-  // PLACEHOLDER: 24/7 direct emergency telephone number for labour / emergency unit
-  emergencyUnitNumber: '+2348001122334',
+  // Confirmed from hospital interview: Non-covered clinic day schedule notice
+  sessionNote: 'Monday is registration day. Wednesday is immunisation, which this system does not cover.',
 
-  // PLACEHOLDER: Google Maps pin URL for navigation
-  googleMapsUrl: 'https://maps.google.com/?q=General+Hospital+Lagos+Island+Nigeria',
+  // Google Maps search link for the confirmed clinic address
+  googleMapsUrl:
+    'https://www.google.com/maps/search/?api=1&query=Inside+the+main+University+Health+Services+Clinic%2C+BUK+New+Site%2C+Rimin+Gata%2C+Gwarzo+Road%2C+Kano',
 };

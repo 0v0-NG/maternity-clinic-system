@@ -9,6 +9,7 @@ import {
   MapPin,
   ExternalLink,
   Phone,
+  Mail,
   Clock,
   Calendar,
   AlertTriangle,
@@ -144,11 +145,35 @@ export default function ClinicInfoPage() {
                 </div>
               </div>
 
-              <div className="bg-clinic-50 rounded-xl p-3.5 space-y-2 border border-primary-100 text-xs text-body">
+              <div className="bg-clinic-50 rounded-xl p-3.5 space-y-2.5 border border-primary-100 text-xs text-body">
                 <div className="flex items-start gap-2.5">
                   <MapPin size={16} className="text-primary-600 flex-shrink-0 mt-0.5" />
                   <span className="leading-relaxed font-medium">{info.address}</span>
                 </div>
+
+                {info.clinicPhone && (
+                  <div className="flex items-center gap-2.5 pt-1 border-t border-primary-100/70">
+                    <Phone size={15} className="text-primary-600 flex-shrink-0" />
+                    <a
+                      href={`tel:${info.clinicPhone.replace(/[^\d+]/g, '')}`}
+                      className="font-semibold text-primary-700 hover:underline"
+                    >
+                      {info.clinicPhone}
+                    </a>
+                  </div>
+                )}
+
+                {info.clinicEmail && (
+                  <div className="flex items-center gap-2.5">
+                    <Mail size={15} className="text-primary-600 flex-shrink-0" />
+                    <a
+                      href={`mailto:${info.clinicEmail}`}
+                      className="font-semibold text-primary-700 hover:underline"
+                    >
+                      {info.clinicEmail}
+                    </a>
+                  </div>
+                )}
               </div>
 
               {info.googleMapsUrl && (
@@ -165,73 +190,20 @@ export default function ClinicInfoPage() {
               )}
             </Card>
 
-            {/* Emergency Unit Card */}
-            {(() => {
-              const emergencyNumber = (info.emergencyUnitNumber || info.emergencyUnit?.phone || '').trim();
-              const telHref = emergencyNumber
-                ? (emergencyNumber.startsWith('+')
-                    ? '+' + emergencyNumber.slice(1).replace(/\D/g, '')
-                    : emergencyNumber.replace(/\D/g, ''))
-                : '';
-
-              return (
-                <Card className="p-5 space-y-4 border-red-200 shadow-sm bg-red-50/50">
-                  <div className="flex items-center justify-between border-b border-red-200 pb-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-red-100 text-status-emergency flex items-center justify-center flex-shrink-0">
-                        <Phone size={18} />
-                      </div>
-                      <div>
-                        <h2 className="text-base font-bold text-red-950">
-                          Emergency Unit
-                        </h2>
-                        <span className="text-[11px] text-red-700 font-medium">
-                          Labour or acute obstetric emergencies
-                        </span>
-                      </div>
-                    </div>
-                    <span className="text-[11px] font-bold bg-status-emergency text-white px-2.5 py-0.5 rounded-full">
-                      24/7
-                    </span>
-                  </div>
-
-                  {emergencyNumber ? (
-                    <div className="space-y-3">
-                      <div>
-                        <span className="text-[11px] font-semibold uppercase tracking-wider text-red-800 block mb-0.5">
-                          Emergency Contact Number
-                        </span>
-                        <p className="text-xl font-black text-status-emergency tracking-wide">
-                          {emergencyNumber}
-                        </p>
-                      </div>
-
-                      <p className="text-xs text-red-900 leading-relaxed">
-                        For severe symptoms (heavy bleeding, severe abdominal pain, labour onset), call immediately or proceed directly to the Emergency Obstetric Triage.
-                      </p>
-
-                      <div className="pt-1">
-                        <a href={`tel:${telHref}`} className="block w-full">
-                          <Button
-                            type="button"
-                            variant="danger"
-                            className="w-full text-sm font-bold gap-2 h-11"
-                          >
-                            <Phone size={16} /> Call now
-                          </Button>
-                        </a>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="py-2">
-                      <p className="text-xs text-red-900 font-medium leading-relaxed">
-                        Emergency number not available yet. Please go straight to the Emergency Unit.
-                      </p>
-                    </div>
-                  )}
-                </Card>
-              );
-            })()}
+            {/* Emergency Notice Card */}
+            <Card className="p-5 space-y-2.5 border-red-200 shadow-sm bg-red-50/60">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-red-100 text-status-emergency flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle size={18} />
+                </div>
+                <h2 className="text-base font-bold text-red-950">
+                  Emergency Notice
+                </h2>
+              </div>
+              <p className="text-xs text-red-900 font-semibold leading-relaxed">
+                Labour or an emergency? This clinic does not handle deliveries or emergencies. Go straight to the nearest hospital emergency unit.
+              </p>
+            </Card>
 
             {/* Clinic Operating Days & Hours */}
             {info.clinicDaysAndHours && (
@@ -252,9 +224,11 @@ export default function ClinicInfoPage() {
                           For pregnant mothers
                         </span>
                       </div>
-                      <span className="text-[11px] font-semibold text-primary-700 bg-primary-50 border border-primary-200 px-2.5 py-0.5 rounded-full">
-                        {info.clinicDaysAndHours.antenatal.slotDurationMinutes} min slots
-                      </span>
+                      {info.clinicDaysAndHours.antenatal.slotDurationMinutes && (
+                        <span className="text-[11px] font-semibold text-primary-700 bg-primary-50 border border-primary-200 px-2.5 py-0.5 rounded-full">
+                          {info.clinicDaysAndHours.antenatal.slotDurationMinutes} min slots
+                        </span>
+                      )}
                     </div>
 
                     <div className="space-y-2 text-xs">
@@ -303,9 +277,11 @@ export default function ClinicInfoPage() {
                           For mothers and newborns
                         </span>
                       </div>
-                      <span className="text-[11px] font-semibold text-primary-700 bg-primary-50 border border-primary-200 px-2.5 py-0.5 rounded-full">
-                        {info.clinicDaysAndHours.postnatal.slotDurationMinutes} min slots
-                      </span>
+                      {info.clinicDaysAndHours.postnatal.slotDurationMinutes && (
+                        <span className="text-[11px] font-semibold text-primary-700 bg-primary-50 border border-primary-200 px-2.5 py-0.5 rounded-full">
+                          {info.clinicDaysAndHours.postnatal.slotDurationMinutes} min slots
+                        </span>
+                      )}
                     </div>
 
                     <div className="space-y-2 text-xs">
@@ -340,6 +316,13 @@ export default function ClinicInfoPage() {
                       )}
                     </div>
                   </Card>
+                )}
+
+                {info.sessionNote && (
+                  <div className="bg-clinic-50 border border-primary-200 rounded-xl p-3 text-xs text-clinic-dark leading-relaxed">
+                    <strong className="block font-semibold mb-0.5">Other Clinic Days:</strong>
+                    {info.sessionNote}
+                  </div>
                 )}
               </div>
             )}

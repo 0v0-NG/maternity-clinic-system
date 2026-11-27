@@ -228,6 +228,42 @@ describe('Staff Endpoints: Appointment Details, Search, Desk Registration, and B
       expect(res.body.data.some((m) => m.id === mother2Id)).toBe(true);
     });
 
+    it('should match mother by partial case-insensitive NHIS number (hmo_number) and hospital_id without logging search query', async () => {
+      // Seed hospital_id and hmo_number for mother2Id
+      await db('mothers').where('id', mother2Id).update({
+        hospital_id: 'BUK-FLD-8821',
+        hmo_number: 'NHIS-KANO-994',
+      });
+
+      const byNhisRes = await request(app)
+        .get('/api/mothers/search?q=kano-99')
+        .set('Authorization', `Bearer ${frontDeskToken}`);
+
+      expect(byNhisRes.statusCode).toBe(200);
+      const matchedNhis = byNhisRes.body.data.find((m) => m.id === mother2Id);
+      expect(matchedNhis).toBeDefined();
+      expect(matchedNhis.hospital_id).toBe('BUK-FLD-8821');
+      expect(matchedNhis.hmo_number).toBe('NHIS-KANO-994');
+
+      const byFolderRes = await request(app)
+        .get('/api/mothers/search?q=fld-882')
+        .set('Authorization', `Bearer ${frontDeskToken}`);
+
+      expect(byFolderRes.statusCode).toBe(200);
+      const matchedFolder = byFolderRes.body.data.find((m) => m.id === mother2Id);
+      expect(matchedFolder).toBeDefined();
+
+      // Verify audit log never stores search text
+      const auditLogs = await db('audit_logs')
+        .where('action', 'STAFF_SEARCH_MOTHERS')
+        .orderBy('created_at', 'desc')
+        .limit(5);
+      auditLogs.forEach((log) => {
+        expect(log.details).not.toContain('kano-99');
+        expect(log.details).not.toContain('fld-882');
+      });
+    });
+
     it('should return empty list when no match is found', async () => {
       const res = await request(app)
         .get('/api/mothers/search?q=NonexistentPerson')
@@ -440,6 +476,108 @@ describe('Staff Endpoints: Appointment Details, Search, Desk Registration, and B
       expect(checkinRes.statusCode).toBe(200);
       expect(checkinRes.body.data.status).toBe('checked_in');
       expect(checkinRes.body.data.queueNumber).toBeDefined();
+    });
+  });
+
+  describe('8. GET /api/mothers/:id returns past & upcoming visits newest first without clinical data', () => {
+    it('should deny mothers (403) and return ordered non-clinical visits with baby names + audit log for staff', async () => {
+      const forbiddenRes = await request(app)
+        .get(`/api/mothers/${mother1Id}`)
+        .set('Authorization', `Bearer ${mother1Token}`);
+      expect(forbiddenRes.statusCode).toBe(403);
+
+      // Seed an older completed appointment + a newer booked appointment for mother1Id
+      const olderSlotId = uuidv4();
+      const newerSlotId = uuidv4();
+      await db('schedule_slots').insert([
+        {
+          id: olderSlotId,
+          clinic_id: pncClinicId,
+          slot_date: '2026-10-01',
+          start_time: '09:30:00',
+          end_time: '10:00:00',
+          is_walkin: false,
+          is_blocked: false,
+        },
+        {
+          id: newerSlotId,
+          clinic_id: pncClinicId,
+          slot_date: '2026-12-30',
+          start_time: '10:00:00',
+          end_time: '10:30:00',
+          is_walkin: false,
+          is_blocked: false,
+        },
+      ]);
+
+      const visitBabyId = uuidv4();
+      await db('babies').insert({
+        id: visitBabyId,
+        mother_id: mother1Id,
+        name: 'Baby Sadiq',
+        date_of_birth: '2026-05-01',
+        sex: 'male',
+      });
+
+      const olderApptId = uuidv4();
+      const newerApptId = uuidv4();
+      await db('appointments').insert([
+        {
+          id: olderApptId,
+          mother_id: mother1Id,
+          clinic_id: pncClinicId,
+          slot_id: olderSlotId,
+          status: 'completed',
+          booking_type: 'baby',
+          booked_at: new Date(),
+        },
+        {
+          id: newerApptId,
+          mother_id: mother1Id,
+          clinic_id: pncClinicId,
+          slot_id: newerSlotId,
+          status: 'booked',
+          booking_type: 'both',
+          booked_at: new Date(),
+        },
+      ]);
+
+      await db('appointment_babies').insert([
+        { appointment_id: olderApptId, baby_id: visitBabyId },
+        { appointment_id: newerApptId, baby_id: visitBabyId },
+      ]);
+
+      const res = await request(app)
+        .get(`/api/mothers/${mother1Id}`)
+        .set('Authorization', `Bearer ${frontDeskToken}`);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data.visits)).toBe(true);
+      expect(res.body.data.visits.length).toBeGreaterThanOrEqual(2);
+
+      // Verify newest first ordering
+      const idxNew = res.body.data.visits.findIndex((v) => v.id === newerApptId);
+      const idxOld = res.body.data.visits.findIndex((v) => v.id === olderApptId);
+      expect(idxNew).toBeGreaterThanOrEqual(0);
+      expect(idxOld).toBeGreaterThan(idxNew);
+
+      const newerVisit = res.body.data.visits[idxNew];
+      expect(newerVisit.date).toBe('2026-12-30');
+      expect(newerVisit.start_time).toBe('10:00:00');
+      expect(newerVisit.clinic_name).toBe('Postnatal Clinic');
+      expect(newerVisit.status).toBe('booked');
+      expect(newerVisit.babies.map((b) => b.name)).toContain('Baby Sadiq');
+      // Verify no clinical notes/vitals fields exist
+      expect(newerVisit.notes).toBeUndefined();
+      expect(newerVisit.diagnosis).toBeUndefined();
+
+      // Verify audit log written
+      const log = await db('audit_logs')
+        .where({ action: 'STAFF_VIEW_MOTHER_PROFILE' })
+        .orderBy('created_at', 'desc')
+        .first();
+      expect(log).toBeDefined();
     });
   });
 });

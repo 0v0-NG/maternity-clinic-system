@@ -26,10 +26,10 @@ router.post(
     body('hmo_number')
       .optional()
       .isString()
-      .withMessage('HMO / NHIA number must be a string.')
+      .withMessage('NHIS number must be a string.')
       .trim()
       .isLength({ max: 50 })
-      .withMessage('HMO / NHIA number must not exceed 50 characters.'),
+      .withMessage('NHIS number must not exceed 50 characters.'),
   ]),
   authController.register
 );

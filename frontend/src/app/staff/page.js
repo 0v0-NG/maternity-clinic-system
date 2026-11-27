@@ -1196,7 +1196,7 @@ export default function StaffPortalPage() {
 
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-900 leading-relaxed">
               <strong className="block font-semibold mb-0.5">Rule Notice:</strong>
-              Appointments may only be marked as No-show after the appointment start time plus grace period (15 mins) has passed.
+              Appointments may only be marked as No-show after the appointment start time plus grace period (30 mins) has passed.
             </div>
 
             <div className="flex gap-2.5 pt-1">

@@ -66,13 +66,14 @@ const updateProfile = async (req, res, next) => {
 
 /**
  * Get a mother's profile by ID (staff only).
+ * Includes registered babies and non-clinical visit history (past and upcoming, newest first).
  * GET /api/mothers/:id
  */
 const getMotherById = async (req, res, next) => {
   try {
     const mother = await db('mothers')
       .where('id', req.params.id)
-      .select('id', 'name', 'phone', 'hospital_id', 'hmo_number', 'created_at')
+      .select('id', 'name', 'phone', 'hospital_id', 'hmo_number', 'registered_by_staff', 'created_at')
       .first();
 
     if (!mother) {
@@ -81,6 +82,54 @@ const getMotherById = async (req, res, next) => {
 
     const babies = await db('babies').where('mother_id', req.params.id)
       .select('id', 'name', 'date_of_birth', 'sex');
+
+    // Non-clinical past and upcoming visits, newest first
+    const rawVisits = await db('appointments')
+      .join('schedule_slots', 'appointments.slot_id', 'schedule_slots.id')
+      .join('clinics', 'appointments.clinic_id', 'clinics.id')
+      .where('appointments.mother_id', req.params.id)
+      .select(
+        'appointments.id',
+        'schedule_slots.slot_date as date',
+        'schedule_slots.start_time',
+        'schedule_slots.end_time',
+        'clinics.id as clinic_id',
+        'clinics.name as clinic_name',
+        'appointments.status',
+        'appointments.booking_type',
+        'appointments.late_arrival'
+      )
+      .orderBy('schedule_slots.slot_date', 'desc')
+      .orderBy('schedule_slots.start_time', 'desc');
+
+    const visitIds = rawVisits.map((v) => v.id);
+    const babiesByVisitId = {};
+    if (visitIds.length > 0) {
+      const visitBabies = await db('appointment_babies')
+        .join('babies', 'appointment_babies.baby_id', 'babies.id')
+        .whereIn('appointment_babies.appointment_id', visitIds)
+        .select('appointment_babies.appointment_id', 'babies.id', 'babies.name');
+
+      for (const vb of visitBabies) {
+        if (!babiesByVisitId[vb.appointment_id]) {
+          babiesByVisitId[vb.appointment_id] = [];
+        }
+        babiesByVisitId[vb.appointment_id].push({ id: vb.id, name: vb.name });
+      }
+    }
+
+    const visits = rawVisits.map((v) => ({
+      id: v.id,
+      date: v.date,
+      start_time: v.start_time,
+      end_time: v.end_time,
+      clinic_id: v.clinic_id,
+      clinic_name: v.clinic_name,
+      status: v.status,
+      booking_type: v.booking_type,
+      late_arrival: Boolean(v.late_arrival),
+      babies: babiesByVisitId[v.id] || [],
+    }));
 
     // Audit log: staff viewing mother profile
     await db('audit_logs').insert({
@@ -93,7 +142,12 @@ const getMotherById = async (req, res, next) => {
 
     res.json({
       success: true,
-      data: { ...mother, babies },
+      data: {
+        ...mother,
+        registered_by_staff: Boolean(mother.registered_by_staff),
+        babies,
+        visits,
+      },
     });
   } catch (error) {
     next(error);
@@ -101,7 +155,7 @@ const getMotherById = async (req, res, next) => {
 };
 
 /**
- * Search mothers by name or phone (front desk and admin only).
+ * Search mothers by name, phone, NHIS number (hmo_number), or hospital folder ID (front desk and admin only).
  * GET /api/mothers/search?q=
  */
 const searchMothers = async (req, res, next) => {
@@ -119,6 +173,8 @@ const searchMothers = async (req, res, next) => {
     const query = db('mothers')
       .where(function () {
         this.whereRaw('LOWER(mothers.name) LIKE ?', [namePattern]);
+        this.orWhereRaw('LOWER(mothers.hmo_number) LIKE ?', [namePattern]);
+        this.orWhereRaw('LOWER(mothers.hospital_id) LIKE ?', [namePattern]);
         this.orWhere('mothers.phone', 'LIKE', `%${cleanQ}%`);
 
         if (digits.length >= 3) {

@@ -14,7 +14,7 @@ This document defines click-by-click manual testing procedures for verifying the
 
 ## Step 1 & 2: Authentication & Foundation (Recap)
 - [x] NDPA 2023 Consent checkbox is mandatory on `/register`.
-- [x] Input layout alignment for "Hospital ID" and "HMO / NHIA no.".
+- [x] Input layout alignment for "Hospital ID" and "NHIS number".
 - [x] Safe JSON parsing in `useAuth.js` with fallback for missing/corrupt storage.
 - [x] OTP single-flight submission preventing double submit toasts.
 - [x] Automatic session redirection based on user role.
@@ -27,9 +27,9 @@ This document defines click-by-click manual testing procedures for verifying the
 1. Navigate to `http://localhost:3000/register`.
 2. Fill in registration details:
    - Full Name: `Test Mother`
-   - Phone: Unique 11-digit number (e.g. `080` + 8 random digits)
+   - Phone number for SMS (can be a husband's or relative's number): Unique 11-digit number (e.g. `080` + 8 random digits)
    - Hospital ID: `HOSP-TEST-001` (optional)
-   - HMO / NHIA no.: `HMO-TEST-001` (optional)
+   - NHIS number: `NHIS-TEST-001` (optional)
    - Password: `Password123!`
    - Confirm Password: `Password123!`
    - Check statutory NDPA consent box.
@@ -57,7 +57,7 @@ This document defines click-by-click manual testing procedures for verifying the
    - Header shows clinic brand and personalized greeting: *"Hello, Test 👋"*.
    - Logout button in header properly clears storage and returns to `/login`.
 3. **Emergency Notice**:
-   - Top of screen displays red Emergency Notice banner: *"Labour or an emergency? Go straight to the Emergency Unit."*.
+   - Top of screen displays red Emergency Notice banner: *"Labour or an emergency? This clinic does not handle deliveries or emergencies. Go straight to the nearest hospital emergency unit."*.
 4. **Empty State (Initial)**:
    - Before any appointment is booked, the Next Appointment card shows:
      - Calendar icon.
@@ -348,7 +348,7 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
 3. **Verify Header**:
    - Header title: *"Live Clinic Queue"*.
    - Back arrow navigates back to `/dashboard`.
-   - Emergency notice is displayed at the top: *"Labour or an emergency? Go straight to the Emergency Unit."*.
+   - Emergency notice is displayed at the top: *"Labour or an emergency? This clinic does not handle deliveries or emergencies. Go straight to the nearest hospital emergency unit."*.
 4. **Verify Empty State**:
    - Clock icon is horizontally centered.
    - Title: *"No Appointments Today"*.
@@ -426,12 +426,12 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
    - Field 1 **Full Name**: Pre-filled with her name (editable).
    - Field 2 **Phone Number (Verified)**: Pre-filled with verified phone number, disabled/read-only with helper note.
    - Field 3 **Hospital ID**: Editable input with placeholder *"Folder No. (e.g. HOSP-1234)"*.
-   - Field 4 **HMO / NHIA No.**: Editable input with placeholder *"Optional"*.
+   - Field 4 **NHIS number**: Editable input with placeholder *"NHIS number (optional)"*.
    - Primary button: **Save** (48px high, Nigerian green).
 3. **Edit Profile Details**:
    - Update Full Name to `Amina Bello-Smith`.
    - Enter Hospital ID: `HOSP-998877`.
-   - Enter HMO Number: `NHIA-112233`.
+   - Enter NHIS number: `NHIS-112233`.
    - Click **Save**.
 4. **Expected**:
    - Button briefly shows *"Saving..."*.
@@ -492,36 +492,35 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
 2. From `/profile`, tap the **Hospital & Clinic Information** card.
 3. Verify page loads at `/clinic-info` with:
    - Header with back button to `/dashboard` and refresh icon.
-   - Top emergency banner: *"Labour or an emergency? Go straight to the Emergency Unit."*.
+   - Top emergency banner: *"Labour or an emergency? This clinic does not handle deliveries or emergencies. Go straight to the nearest hospital emergency unit."*.
    - Bottom navigation bar visible and fixed.
 
-#### B. Medical Facility & Google Maps
+#### B. Medical Facility, Contacts & Google Maps
 1. **Verify Hospital Card**:
-   - Displays hospital name: *"General Hospital Lagos / Federal Medical Centre"*.
-   - Displays physical address with pin icon: *"123 Broad Street, Lagos Island, Lagos State, Nigeria"*.
+   - Displays hospital name: *"University Health Services, Bayero University, Kano - Ante-Natal Clinic"*.
+   - Displays physical address with pin icon: *"Inside the main University Health Services Clinic, BUK New Site, Rimin Gata, Gwarzo Road, Kano"*.
+   - Displays tap-to-call `clinicPhone` (`0810 704 7641`, `tel:08107047641`) and mailto `clinicEmail` (`info.clinic@buk.edu.ng`, `mailto:info.clinic@buk.edu.ng`).
    - Click **Open in Google Maps**:
-     - Opens Google Maps in a new browser tab (`target="_blank" rel="noopener noreferrer"`).
+     - Opens Google Maps search link in a new browser tab (`target="_blank" rel="noopener noreferrer"`).
 
-#### C. Emergency Unit & Tap-to-Call
-1. **Verify Emergency Card**:
-   - Clearly labelled "Emergency Unit" card with red accent styling and *"24/7"* availability badge.
-   - Emergency contact number is visible as text: `+2348001122334`.
-   - Click **Call now**:
-     - Verifies `tel:+2348001122334` phone dialer link triggers.
-   - Fallback behavior: if number is missing, displays: *"Emergency number not available yet. Please go straight to the Emergency Unit."*.
+#### C. Emergency Notice Card (No Deliveries/Emergencies)
+1. **Verify Emergency Notice Card**:
+   - Displays red **Emergency Notice** card stating: *"Labour or an emergency? This clinic does not handle deliveries or emergencies. Go straight to the nearest hospital emergency unit."*.
+   - Verify no emergency unit phone number or 24/7 emergency call button is displayed.
 
 #### D. Clinic Schedules & Indicative Booking Notice
 1. **Verify Antenatal Clinic Card**:
-   - Hours: `08:00 - 12:00 (Lagos Time)`.
-   - Slot duration: `20 min slots`.
-   - Clinic Days: Chips for `Monday`, `Tuesday`, `Wednesday`, `Thursday`, `Friday`.
-   - Description text explaining morning consultation sessions.
+   - Hours: `About 09:30 to mid-day (Lagos Time)`.
+   - Slot duration: read dynamically from `clinics` table (e.g. `20 min slots`).
+   - Clinic Days: Chips for `Tuesday`, `Thursday`.
+   - Description text explaining Tuesday and Thursday clinic sessions.
 2. **Verify Postnatal Clinic Card**:
-   - Hours: `13:00 - 16:00 (Lagos Time)`.
-   - Slot duration: `30 min slots`.
-   - Clinic Days: Chips for `Monday`, `Wednesday`, `Friday`.
-   - Description text explaining afternoon mother and newborn checks.
-3. **Verify Indicative Notice**:
+   - Hours: `About 09:30 to mid-day (Lagos Time)`.
+   - Slot duration: read dynamically from `clinics` table (e.g. `30 min slots`).
+   - Clinic Days: Chips for `Tuesday`, `Thursday`.
+   - Description text explaining Tuesday and Thursday clinic sessions.
+3. **Verify Session & Indicative Notices**:
+   - Schedule note displays: *"Monday is registration day. Wednesday is immunisation, which this system does not cover."*.
    - Amber alert explains that days shown are indicative schedules, and actual booking availability is determined by the live booking calendar.
 4. **Verify Centered CTA**:
    - Centered **Book Appointment** button links directly to `/book`.
@@ -581,7 +580,7 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
    - On the appointment card, click **Check In**.
    - Button disables and briefly displays *"Processing..."*.
    - **Expected Result**:
-     - Success toast appears: *"Patient checked in! Queue Ticket: ANC-001"* (or assigned ticket number, with `(Marked Late)` if arriving after 15-minute grace period).
+     - Success toast appears: *"Patient checked in! Queue Ticket: ANC-001"* (or assigned ticket number, with `(Marked Late)` if arriving after 30-minute grace period).
      - Appointment status updates to **Checked In** with assigned ticket number.
      - Count chips update: Booked count decreases, Checked In count increases.
      - Live Queue Tracker on the right panel adds the patient with ticket `ANC-001` and status *"Waiting"*.
@@ -599,9 +598,9 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
 1. In Tab B (Front Desk), locate a booked appointment.
 2. Click **No-show**:
    - Confirmation dialog opens: *"Mark as No-Show?"*.
-   - Explanatory rule: *"Appointments may only be marked as No-show after the appointment start time plus grace period (15 mins) has passed."*.
+   - Explanatory rule: *"Appointments may only be marked as No-show after the appointment start time plus grace period (30 mins) has passed."*.
 3. Click **Confirm No-Show**:
-   - If attempted before `start_time + 15m` has passed:
+   - If attempted before `start_time + 30m` has passed:
      - Error toast appears with mapped friendly message: *"You cannot mark this as a no-show yet. Please wait until after your appointment time."*.
    - If grace period has expired:
      - Status updates cleanly to **No-Show**.
@@ -655,13 +654,14 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
 1. Log in as Front Desk Officer (`+2340000000001` / `password123`) and open `/staff`.
 2. In the Front Desk Reception header, click **Look up a mother**:
    - The "Look Up Patient Record" modal opens with an autofocus search field.
-3. In the search box, enter at least 3 characters (e.g. `Ami` or `080`):
+3. In the search box, enter at least 3 characters (e.g. `Ami`, `080`, folder number, or NHIS number):
    - A loading skeleton pulses while searching.
-   - Matching mother cards appear showing Name, Phone, and number of registered babies.
+   - Matching mother cards appear showing Name, Phone, Folder number, NHIS number, and number of registered babies.
 4. Click on a patient (e.g. *Mrs. Amina Bello*):
    - Full read-only profile loads via `GET /api/mothers/:id`.
-   - Displays Name, Phone, Hospital ID, HMO/NHIA Number, Registration Date, and Desk Registration badge (if registered in person).
+   - Displays Name, Phone, Folder number, NHIS number, Registration Date, and Desk Registration badge (if registered in person).
    - Lists all registered babies with Name, Gender, and Date of Birth formatted as `DD/MM/YYYY`.
+   - Lists past and upcoming visits newest first showing date, time, clinic, status, and baby names (without any clinical data).
 5. Click **Book appointment for Mrs. Amina Bello**:
    - Lookup modal closes and the Walk-in Booking Wizard opens immediately with Amina pre-selected at Step 2 (Clinic & Attendee).
 
@@ -674,7 +674,7 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
    - Notice displays: *"No mother found matching 'Zainab D'"*.
    - A **Register new mother** button is presented.
 3. Click **Register new mother**:
-   - The inline registration form expands.
+   - The inline registration form expands (phone field labelled *"Phone number for SMS (can be a husband's or relative's number) *"*, NHIS field labelled *"NHIS number (Optional)"*).
 4. **Validation Test (Consent Checkbox)**:
    - Enter Name: `Zainab Danladi`, Phone: `08099887766`.
    - Leave the consent checkbox unticked.
@@ -689,7 +689,7 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
      - A quick link *"Search for <phone>"* is provided to switch directly to searching her record.
 6. **Successful Registration**:
    - Enter a new unique phone number (e.g. `08055443322`).
-   - Enter optional Hospital ID: `HOSP-ZD-01`, HMO Number: `NHIA-9988`.
+   - Enter optional Hospital ID: `HOSP-ZD-01`, NHIS number: `NHIS-9988`.
    - Ensure the NDPA 2023 consent checkbox is ticked.
    - Click **Save**:
      - Patient is registered in backend (`POST /api/mothers`) with `registered_by_staff: true`.
@@ -813,7 +813,7 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
 
 #### Case C: Registration & OTP Failure Field Preservation
 1. On `/register`, submit mismatched passwords or invalid data:
-   - Form fields (name, phone, hospital ID, HMO number, consent) are retained.
+   - Form fields (name, phone, hospital ID, NHIS number, consent) are retained.
    - Only password fields are cleared.
    - Friendly toast error is shown and no page reload occurs.
 2. At OTP verification step:
@@ -982,8 +982,8 @@ To test cancellation and rescheduling rules, create an appointment far enough ah
    - Weekdays checkboxes: Notice Monday to Friday are checked by default (0-6 numbering). Check/uncheck individual days and verify state toggles.
    - Optional Clinician selector: Lists clinicians only (`doctor` and `midwife` roles, excluding admin and front desk). Leave unassigned or select a test clinician.
    - **Live Preview Line**: Check that the live calculation appears:
-     - Shows calculated slots per active day (e.g. 12 slots/day at 20 mins/slot).
-     - Displays note that ~20% of slots (~2 slots/day) will be reserved for hospital walk-in patients.
+     - Shows the clinic's saved slot length (e.g. `20-min slots`) and saved walk-in percentage (e.g. `20% walk-in share`).
+     - Shows calculated slots per active day and how many slots are held for walk-ins using the clinic's `walkin_reserve_pct` (spread evenly across the day).
 3. **Validation Guards**:
    - Try selecting a past start date: form blocks submission (*"Cannot generate slots for past dates"*).
    - Try selecting a date range > 31 days (e.g. 01/01/2027 to 15/02/2027): form blocks submission (*"Date range cannot exceed 31 days"*).

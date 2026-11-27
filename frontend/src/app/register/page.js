@@ -220,7 +220,7 @@ export default function RegisterPage() {
 
               <div>
                 <label className="block text-base font-medium text-body mb-1.5" htmlFor="phone">
-                  Phone number
+                  Phone number for SMS (can be a husband&apos;s or relative&apos;s number)
                 </label>
                 <input
                   id="phone"
@@ -280,13 +280,13 @@ export default function RegisterPage() {
                 </div>
                 <div>
                   <label className="block text-base font-medium text-body mb-1.5 whitespace-nowrap" htmlFor="hmo_number">
-                    HMO / NHIA no.
+                    NHIS number
                   </label>
                   <input
                     id="hmo_number"
                     type="text"
                     className="input-field text-base"
-                    placeholder="Enrollment number (optional)"
+                    placeholder="NHIS number (optional)"
                     value={form.hmo_number}
                     onChange={(e) => setForm({ ...form, hmo_number: e.target.value })}
                   />

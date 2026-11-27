@@ -219,15 +219,51 @@ describe('Auth Endpoints', () => {
     });
   });
 
-  describe('GET /api/clinic-info', () => {
-    it('should return hospital and clinic details publicly', async () => {
+  describe('GET /api/clinic-info & GET /api/emergency-notice', () => {
+    it('should return confirmed BUK hospital details, clinic contacts, sessionNote, and slot lengths from DB', async () => {
+      const { v4: uuidv4 } = require('uuid');
+      const ancId = uuidv4();
+      const pncId = uuidv4();
+
+      await db('clinics').insert([
+        { id: ancId, name: 'Antenatal Clinic', slot_duration_min: 25, walkin_reserve_pct: 0.2 },
+        { id: pncId, name: 'Postnatal Clinic', slot_duration_min: 35, walkin_reserve_pct: 0.2 },
+      ]);
+
       const res = await request(app).get('/api/clinic-info');
 
       expect(res.statusCode).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.hospitalName).toBeDefined();
-      expect(res.body.data.emergencyUnitNumber).toBeDefined();
-      expect(res.body.data.googleMapsUrl).toBeDefined();
+      expect(res.body.data.confirmedFromInterview).toBe(true);
+      expect(res.body.data.hospitalName).toBe(
+        'University Health Services, Bayero University, Kano - Ante-Natal Clinic'
+      );
+      expect(res.body.data.address).toBe(
+        'Inside the main University Health Services Clinic, BUK New Site, Rimin Gata, Gwarzo Road, Kano'
+      );
+      expect(res.body.data.clinicPhone).toBe('0810 704 7641');
+      expect(res.body.data.clinicEmail).toBe('info.clinic@buk.edu.ng');
+      expect(res.body.data.sessionNote).toBe(
+        'Monday is registration day. Wednesday is immunisation, which this system does not cover.'
+      );
+      expect(res.body.data.clinicDaysAndHours.antenatal.days).toEqual(['Tuesday', 'Thursday']);
+      expect(res.body.data.clinicDaysAndHours.postnatal.days).toEqual(['Tuesday', 'Thursday']);
+      expect(res.body.data.clinicDaysAndHours.antenatal.slotDurationMinutes).toBe(25);
+      expect(res.body.data.clinicDaysAndHours.postnatal.slotDurationMinutes).toBe(35);
+      expect(res.body.data.emergencyUnitNumber).toBeUndefined();
+      expect(res.body.data.googleMapsUrl).toContain('https://www.google.com/maps/search/');
+
+      await db('clinics').whereIn('id', [ancId, pncId]).del();
+    });
+
+    it('should return the clinic-wide non-emergency notice on GET /api/emergency-notice', async () => {
+      const res = await request(app).get('/api/emergency-notice');
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.message).toBe(
+        'Labour or an emergency? This clinic does not handle deliveries or emergencies. Go straight to the nearest hospital emergency unit.'
+      );
     });
   });
 

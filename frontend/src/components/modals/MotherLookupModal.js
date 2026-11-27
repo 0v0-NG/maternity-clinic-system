@@ -10,14 +10,15 @@ import {
   AlertCircle,
   ArrowLeft,
   CalendarPlus,
-  ShieldCheck,
+  Clock,
 } from 'lucide-react';
 import { motherAPI } from '../../lib/api';
 import { getErrorMessage } from '../../lib/errorMessages';
-import { formatDate } from '../../lib/dateTime';
+import { formatDate, formatTimeRange, formatWhoFor, getLagosToday } from '../../lib/dateTime';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import Skeleton from '../ui/Skeleton';
+import StatusBadge from '../ui/StatusBadge';
 
 export default function MotherLookupModal({
   isOpen,
@@ -113,8 +114,8 @@ export default function MotherLookupModal({
               <h2 className="text-sm font-bold text-body">Look Up Patient Record</h2>
               <p className="text-[11px] text-body-muted">
                 {selectedMotherId
-                  ? 'Patient profile and registered babies (Read-Only)'
-                  : 'Search hospital mother records by name or phone'}
+                  ? 'Patient profile, registered babies & visits (Read-Only)'
+                  : 'Search hospital records by name, phone, folder ID, or NHIS number'}
               </p>
             </div>
           </div>
@@ -146,7 +147,7 @@ export default function MotherLookupModal({
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search by mother's name or phone number..."
+                    placeholder="Search by name, phone, folder number, or NHIS number..."
                     className="w-full text-xs pl-9 pr-4 py-2.5 bg-white border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-xs"
                     autoFocus
                   />
@@ -187,7 +188,10 @@ export default function MotherLookupModal({
                           </span>
                           <p className="text-[11px] text-body-muted">
                             Phone: <strong>{m.phone}</strong>
-                            {m.hospital_id && ` · ID: ${m.hospital_id}`}
+                          </p>
+                          <p className="text-[11px] text-body-muted">
+                            Folder: <strong>{m.hospital_id || 'None'}</strong> · NHIS:{' '}
+                            <strong>{m.hmo_number || 'None'}</strong>
                           </p>
                         </div>
                       </div>
@@ -256,7 +260,7 @@ export default function MotherLookupModal({
                     <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border text-xs">
                       <div>
                         <span className="text-body-muted text-[11px] block">
-                          Hospital ID
+                          Folder number
                         </span>
                         <strong className="text-body">
                           {motherProfile.hospital_id || 'None'}
@@ -264,7 +268,7 @@ export default function MotherLookupModal({
                       </div>
                       <div>
                         <span className="text-body-muted text-[11px] block">
-                          HMO / NHIA
+                          NHIS number
                         </span>
                         <strong className="text-body">
                           {motherProfile.hmo_number || 'None'}
@@ -315,6 +319,71 @@ export default function MotherLookupModal({
                     ) : (
                       <p className="text-xs text-body-muted italic p-3 bg-clinic-50 border border-border rounded-xl">
                         No babies registered for this patient yet.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Visits History (Past & Upcoming, Newest First, Non-Clinical) */}
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold text-body flex items-center gap-1.5">
+                      <Calendar size={14} className="text-primary-600" />
+                      Visits ({motherProfile.visits?.length || 0})
+                    </h4>
+
+                    {motherProfile.visits && motherProfile.visits.length > 0 ? (
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        {motherProfile.visits.map((visit) => {
+                          const isUpcoming =
+                            visit.date >= getLagosToday() &&
+                            !['completed', 'cancelled', 'no_show'].includes(visit.status);
+                          const attendeeLabel =
+                            visit.babies && visit.babies.length > 0
+                              ? `${formatWhoFor(visit.booking_type, visit.babies)}`
+                              : formatWhoFor(visit.booking_type, []);
+
+                          return (
+                            <div
+                              key={visit.id}
+                              className="p-3 bg-white border border-border rounded-xl text-xs space-y-1.5"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div>
+                                  <span className="font-bold text-body block">
+                                    {visit.clinic_name}
+                                  </span>
+                                  <span className="text-[11px] text-body-muted flex items-center gap-1 mt-0.5">
+                                    <Clock size={11} className="text-primary-600" />
+                                    {formatDate(visit.date)} ·{' '}
+                                    {formatTimeRange(visit.start_time, visit.end_time)}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 flex-shrink-0">
+                                  <span
+                                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                                      isUpcoming
+                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                        : 'bg-gray-50 text-gray-600 border-gray-200'
+                                    }`}
+                                  >
+                                    {isUpcoming ? 'Upcoming' : 'Past'}
+                                  </span>
+                                  <StatusBadge
+                                    status={visit.status}
+                                    late_arrival={Boolean(visit.late_arrival)}
+                                    size="small"
+                                  />
+                                </div>
+                              </div>
+                              <p className="text-[11px] text-body-muted">
+                                For: <strong className="text-body">{attendeeLabel}</strong>
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-body-muted italic p-3 bg-clinic-50 border border-border rounded-xl">
+                        No past or upcoming visits found for this patient.
                       </p>
                     )}
                   </div>

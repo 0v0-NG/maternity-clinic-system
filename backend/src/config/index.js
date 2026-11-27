@@ -44,7 +44,7 @@ module.exports = {
 
   // Appointment rules
   cancelCutoffHours: parseInt(process.env.CANCEL_CUTOFF_HOURS, 10) || 4,
-  lateGraceMinutes: parseInt(process.env.LATE_GRACE_MINUTES, 10) || 15,
+  lateGraceMinutes: parseInt(process.env.LATE_GRACE_MINUTES, 10) || 30,
   walkinReservePct: parseFloat(process.env.WALKIN_RESERVE_PCT) || 0.2,
   reminderHours: (process.env.REMINDER_HOURS || '24,2')
     .split(',')

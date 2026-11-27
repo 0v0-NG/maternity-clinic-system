@@ -107,43 +107,40 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
 
 #### `GET /api/clinic-info`
 - **Role**: Public
-- **Description**: Returns hospital metadata, operating days/hours, emergency unit contact, and Google Maps location link. Values are read from `backend/src/config/clinicInfo.js`.
-- **Note on Demonstration Placeholders**: The hospital name, address, phone numbers, and operating days/hours are demo placeholders until verified during institutional hospital interviews. Client calendar interfaces must fetch available dates dynamically from `GET /api/clinics/:id/slots?date=YYYY-MM-DD` rather than hardcoding day-of-week filters.
+- **Description**: Returns hospital metadata, clinic contact phone/email, operating days/hours, registration/immunisation session note, and Google Maps location link. Values are read from `backend/src/config/clinicInfo.js`, while `slotDurationMinutes` is queried dynamically from the `clinics` table.
+- **Confirmed Institutional Details**: Hospital identity, address, telephone/email, and Tuesday/Thursday operating schedules reflect confirmed values from hospital interview (`University Health Services, Bayero University, Kano - Ante-Natal Clinic`). Client calendar interfaces must fetch available dates dynamically from `GET /api/clinics/:id/slots?date=YYYY-MM-DD`.
 - **Success Response (200 OK)**:
 ```json
 {
   "success": true,
   "data": {
-    "hospitalName": "General Hospital Lagos / Federal Medical Centre",
-    "address": "123 Broad Street, Lagos Island, Lagos State, Nigeria",
+    "confirmedFromInterview": true,
+    "hospitalName": "University Health Services, Bayero University, Kano - Ante-Natal Clinic",
+    "address": "Inside the main University Health Services Clinic, BUK New Site, Rimin Gata, Gwarzo Road, Kano",
+    "clinicPhone": "0810 704 7641",
+    "clinicEmail": "info.clinic@buk.edu.ng",
     "clinicDaysAndHours": {
       "antenatal": {
         "days": [
-          "Monday",
           "Tuesday",
-          "Wednesday",
-          "Thursday",
-          "Friday"
+          "Thursday"
         ],
-        "hours": "08:00 - 12:00",
+        "hours": "About 09:30 to mid-day",
         "slotDurationMinutes": 20,
-        "description": "Antenatal clinic sessions run Monday through Friday mornings (08:00 - 12:00) with 20-minute consultation slots."
+        "description": "Antenatal clinic runs on Tuesday and Thursday, about 09:30 to mid-day."
       },
       "postnatal": {
         "days": [
-          "Monday",
           "Tuesday",
-          "Wednesday",
-          "Thursday",
-          "Friday"
+          "Thursday"
         ],
-        "hours": "13:00 - 16:00",
+        "hours": "About 09:30 to mid-day",
         "slotDurationMinutes": 30,
-        "description": "Postnatal clinic sessions run Monday through Friday afternoons (13:00 - 16:00) with 30-minute consultation slots."
+        "description": "Postnatal clinic runs on Tuesday and Thursday, about 09:30 to mid-day."
       }
     },
-    "emergencyUnitNumber": "+2348001122334",
-    "googleMapsUrl": "https://maps.google.com/?q=General+Hospital+Lagos+Island+Nigeria"
+    "sessionNote": "Monday is registration day. Wednesday is immunisation, which this system does not cover.",
+    "googleMapsUrl": "https://www.google.com/maps/search/?api=1&query=Inside+the+main+University+Health+Services+Clinic%2C+BUK+New+Site%2C+Rimin+Gata%2C+Gwarzo+Road%2C+Kano"
   }
 }
 ```
@@ -154,7 +151,7 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
 ```json
 {
   "success": true,
-  "message": "For emergencies, please proceed directly to the Emergency Unit. This system is for scheduled clinic visits only."
+  "message": "Labour or an emergency? This clinic does not handle deliveries or emergencies. Go straight to the nearest hospital emergency unit."
 }
 ```
 
@@ -165,12 +162,12 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
 #### `POST /api/auth/register`
 - **Role**: Public
 - **Body**:
-  - `phone` (string, required): Nigerian phone number (e.g. `08012345678` or `+2348012345678`)
+  - `phone` (string, required): Nigerian phone number for SMS (can be a husband's or relative's number; e.g. `08012345678` or `+2348012345678`)
   - `name` (string, required): Full name
   - `password` (string, required): Minimum 6 characters
   - `consent` (boolean, required): Must be strictly `true` (NDPA 2023 requirement)
   - `hospital_id` (string, optional): Hospital folder/ID number (max 50 characters, trimmed; empty becomes `null`)
-  - `hmo_number` (string, optional): HMO / NHIA enrollment number (max 50 characters, trimmed; empty becomes `null`)
+  - `hmo_number` (string, optional): NHIS number (max 50 characters, trimmed; empty becomes `null`)
 - **Success Response (201 Created)**:
 ```json
 {
@@ -586,7 +583,7 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
 - **Behavior & Grace Period Rules**:
   - Allowed on the appointment's scheduled date only (`Africa/Lagos` time) when status is `booked`.
   - Check-in on any different date, or when the appointment is cancelled or already checked in, is refused with `400 CHECKIN_NOT_ALLOWED`.
-  - **Grace Period (`LATE_GRACE_MINUTES`, default 15)**:
+  - **Grace Period (`LATE_GRACE_MINUTES`, default 30)**:
     - Up to `start_time + grace`: Normal check-in with `late_arrival: false`.
     - After `start_time + grace`: Still accepted, but flagged with `late_arrival: true`.
     - Late mothers join the END of the queue based on their check-in time (`checked_in_at`), never displacing mothers who checked in earlier.
@@ -699,7 +696,7 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
     "name": "Mrs. Amina Bello",
     "phone": "+2348012345678",
     "hospital_id": "HOSP-00123",
-    "hmo_number": "HMO-456",
+    "hmo_number": "NHIS-456",
     "created_at": "2026-11-21T08:55:55.926Z",
     "babies": [
       {
@@ -719,7 +716,7 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
 - **Body**:
   - `name` (string, optional)
   - `hospital_id` (string, optional)
-  - `hmo_number` (string, optional)
+  - `hmo_number` (string, optional): NHIS number
 - **Success Response (200 OK)**:
 ```json
 {
@@ -730,7 +727,7 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
     "name": "Mrs. Amina Bello",
     "phone": "+2348012345678",
     "hospital_id": "HOSP-00123",
-    "hmo_number": "HMO-456",
+    "hmo_number": "NHIS-456",
     "created_at": "2026-11-21T08:55:56.081Z"
   }
 }
@@ -740,7 +737,7 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
 - **Role**: `front_desk`, `admin`
 - **Query**:
   - `q` (string, required): Search query, minimum 3 characters.
-- **Description**: Searches mothers by partial phone number (matching normalized Nigerian phone digits) or by name (case-insensitive substring contains). Returns maximum 20 results. An audit log entry (`STAFF_SEARCH_MOTHERS`) is created recording only the result count (never the search text).
+- **Description**: Searches mothers by partial phone number (matching normalized Nigerian phone digits), name (case-insensitive substring), NHIS number (`hmo_number`, partial, case-insensitive), or hospital folder ID (`hospital_id`, partial, case-insensitive). Returns maximum 20 results. An audit log entry (`STAFF_SEARCH_MOTHERS`) is created recording only the result count (never the search text).
 - **Success Response (200 OK)**:
 ```json
 {
@@ -751,7 +748,7 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
       "name": "Mrs. Amina Bello",
       "phone": "+2348012345678",
       "hospital_id": "HOSP-00123",
-      "hmo_number": "HMO-456",
+      "hmo_number": "NHIS-456",
       "registered_by_staff": false,
       "babies": [
         {
@@ -771,9 +768,9 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
 - **Role**: `front_desk`, `admin`
 - **Body**:
   - `name` (string, required): Patient name
-  - `phone` (string, required): Nigerian phone number formatted to international format
+  - `phone` (string, required): Nigerian phone number for SMS (can be a husband's or relative's number), formatted to international format
   - `hospital_id` (string, optional, max 50 chars)
-  - `hmo_number` (string, optional, max 50 chars)
+  - `hmo_number` (string, optional, max 50 chars): NHIS number
   - `consent_confirmed` (boolean, required, must be `true`): Confirmation that verbal consent was obtained
 - **Description**: Registers a patient in-person at the front desk. Creates a verified mother record (`is_verified: true`, `consent_at: now`, `registered_by_staff: true`) with an unusable random password hash (cannot log in until registering an online account, but can receive SMS reminders). Audit logged as `CREATE_MOTHER_BY_STAFF`.
 - **Success Response (201 Created)**:
@@ -786,7 +783,7 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
     "name": "Mrs. Amina Bello",
     "phone": "+2348012345678",
     "hospital_id": "HOSP-00123",
-    "hmo_number": "HMO-456",
+    "hmo_number": "NHIS-456",
     "registered_by_staff": true,
     "created_at": "2026-11-21T08:55:55.926Z"
   }
@@ -796,7 +793,7 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
 
 #### `GET /api/mothers/:id`
 - **Role**: `front_desk`, `midwife`, `doctor`, `admin`
-- **Description**: Returns mother profile and babies. Automatically writes an audit log entry (`STAFF_VIEW_MOTHER_PROFILE`).
+- **Description**: Returns mother profile, registered babies, and past/upcoming visits ordered newest first (`date`, `start_time`, `end_time`, `clinic_id`, `clinic_name`, `status`, `booking_type`, `late_arrival`, and linked baby names — without any clinical data). Automatically writes an audit log entry (`STAFF_VIEW_MOTHER_PROFILE`).
 - **Success Response (200 OK)**:
 ```json
 {
@@ -806,7 +803,8 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
     "name": "Mrs. Amina Bello",
     "phone": "+2348012345678",
     "hospital_id": "HOSP-00123",
-    "hmo_number": "HMO-456",
+    "hmo_number": "NHIS-456",
+    "registered_by_staff": false,
     "created_at": "2026-11-21T08:55:55.926Z",
     "babies": [
       {
@@ -814,6 +812,25 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
         "name": "Baby Bello",
         "date_of_birth": "2024-11-01",
         "sex": "female"
+      }
+    ],
+    "visits": [
+      {
+        "id": "e8df483f-67d7-4be7-b35f-eb59d9f5aa1a",
+        "date": "2026-11-25",
+        "start_time": "09:30:00",
+        "end_time": "09:50:00",
+        "clinic_id": "ff3280aa-8a8a-47ee-9706-23ca57c9a2ae",
+        "clinic_name": "Postnatal Clinic",
+        "status": "booked",
+        "booking_type": "baby",
+        "late_arrival": false,
+        "babies": [
+          {
+            "id": "09acf693-4082-4757-83cf-afdb1afcaf19",
+            "name": "Baby Bello"
+          }
+        ]
       }
     ]
   }
@@ -911,8 +928,8 @@ When an access token expires, clients submit `{ "refreshToken": "<token>" }` to 
   - `weekdays` (array of integers 0-6, optional): Days to generate (default `[1, 2, 3, 4, 5]`, where 0=Sunday, 1=Monday)
   - `staff_id` (string/UUID, optional)
 - **Behavior**:
-  - Uses clinic's `slot_duration_min`.
-  - Spreads walk-in slots (~20%, e.g. `index % 5 === 2`) evenly through each day, not bunched at the end.
+  - Uses clinic's `slot_duration_min` and `walkin_reserve_pct`.
+  - Spreads walk-in slots evenly through each day according to `clinics.walkin_reserve_pct` (`floor((i+1)*p) > floor(i*p)`), not bunched at the end.
   - Skips slots that already exist (idempotent, safe to run twice).
   - Writes an audit log entry (`GENERATE_SLOTS`).
 - **Success Response (200 OK)**:
@@ -1323,10 +1340,9 @@ The tables below map every user screen action to its corresponding backend endpo
 
 ## 6. Clinical Booking & Operating Rules
 
-1. **Clinic Timetables & Slot Durations (Placeholder Notice)**:
-   - All clinic operating days, hours, and hospital contacts in `/api/clinic-info` are **demonstration placeholders** subject to finalization during institutional hospital interviews.
-   - **Antenatal Clinic (ANC)**: 20 minutes per slot (placeholder hours: 08:00 - 12:00).
-   - **Postnatal Clinic (PNC)**: 30 minutes per slot (placeholder hours: 13:00 - 16:00).
+1. **Clinic Timetables & Slot Durations (Confirmed Institutional Details)**:
+   - Hospital identity, address, telephone/email, and Tuesday/Thursday operating schedules in `/api/clinic-info` reflect confirmed details from institutional hospital interviews (`University Health Services, Bayero University, Kano - Ante-Natal Clinic`; Monday is registration day, Wednesday is immunisation, which this system does not cover).
+   - **Antenatal & Postnatal Slot Lengths**: Read dynamically from the `clinics` database table (`slot_duration_min`, default seed values 20 min ANC and 30 min PNC).
    - **Dynamic Calendar Availability**: Client booking UIs must determine bookable dates and times dynamically by querying `GET /api/clinics/:id/slots?date=YYYY-MM-DD` rather than hardcoding static day filters in the frontend. For testing and demonstration, `npm run seed:demo` generates slots across 5 consecutive calendar days (including weekends), while `POST /api/admin/slots/generate` defaults to weekdays Monday–Friday unless custom weekdays (0-6) are provided.
 2. **Booking Types per Clinic**:
    - **Antenatal Clinic**: Accepts `booking_type: "mother"` only.
@@ -1335,8 +1351,8 @@ The tables below map every user screen action to its corresponding backend endpo
    - When booking for `"baby"` or `"both"`, `baby_ids` is required and must contain UUIDs of babies registered to the booking mother.
 3. **One Patient Per Slot**:
    - Enforced by database partial unique index: `idx_appointments_slot_active ON appointments(slot_id) WHERE status != 'cancelled'`. A cancelled appointment frees the slot immediately.
-4. **Walk-In Slot Reservation (~20%)**:
-   - Approximately 20% of slots are marked `is_walkin: true`, distributed evenly throughout the day (e.g. `index % 5 === 2`).
+4. **Walk-In Slot Reservation (`clinics.walkin_reserve_pct`)**:
+   - Reads the clinic's saved `walkin_reserve_pct` (default `0.2`, configurable 0%–50%) and distributes that exact share of walk-in slots (`is_walkin: true`) evenly throughout the day using `floor((i+1)*p) > floor(i*p)`.
    - These slots are hidden from mother slot queries and rejected if booked by a mother (`SLOT_RESERVED`). Front desk staff can view and book walk-in patients into them.
 5. **No Past Slots**:
    - Mothers cannot book or reschedule into any slot whose start time has passed in Nigeria (`Africa/Lagos` UTC+1). Staff can book walk-in slots for today until the slot's end time.
@@ -1344,7 +1360,7 @@ The tables below map every user screen action to its corresponding backend endpo
    - A mother cannot hold two active appointments that overlap in time on the same date, even across different clinics. The mother's record is locked (`forUpdate()`) during booking and rescheduling to serialize concurrent submissions.
 7. **4-Hour Reschedule & Cancellation Cutoff**:
    - Patients and staff cannot cancel or reschedule appointments within 4 hours of the slot start time (`CUTOFF_PASSED`).
-8. **Late-Arrival Grace Period (`LATE_GRACE_MINUTES`, default 15)**:
+8. **Late-Arrival Grace Period (`LATE_GRACE_MINUTES`, default 30)**:
    - Check-in is permitted on the appointment's scheduled date only (`Africa/Lagos` time) when status is `booked`. Attempting check-in on any other date or on cancelled/checked-in appointments is refused with `CHECKIN_NOT_ALLOWED`.
    - Up to `start_time + grace_minutes`: normal check-in (`late_arrival: false`).
    - After `start_time + grace_minutes`: check-in is still accepted, but flagged with `late_arrival: true`.
@@ -1406,7 +1422,7 @@ The backend is a stateless REST API designed to power web, mobile, and kiosk fro
      - `SLOT_PAST`: *"This time slot has already passed."*
      - `CUTOFF_PASSED`: *"Appointments cannot be rescheduled or cancelled within 4 hours of start time. Please contact the front desk."*
      - `CHECKIN_NOT_ALLOWED`: *"Check-in is only allowed on the scheduled appointment date for active bookings."*
-     - `NO_SHOW_TOO_EARLY`: *"Cannot mark as no-show until the late-arrival grace period (15 minutes) has passed."*
+     - `NO_SHOW_TOO_EARLY`: *"Cannot mark as no-show until the late-arrival grace period (30 minutes) has passed."*
      - `FORBIDDEN`: *"You do not have permission to perform this action."*
 
 
